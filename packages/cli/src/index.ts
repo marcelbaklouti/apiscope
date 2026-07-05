@@ -2,3 +2,5 @@ export { defineConfig, loadConfig, formatIssuePath, ConfigError } from './config
 export type { ApiscopeConfig } from './config'
 export * from './baseline'
 export * from './report'
+export { runCi, waitForReadiness } from './ci'
+export type { CiOptions, CiRun } from './ci'
