@@ -1,3 +1,4 @@
+import { renameSync } from 'node:fs'
 import Database from 'better-sqlite3'
 import type { ChildSpan, RequestSpan, RouteRegistryEntry } from '@apiscope/core'
 
@@ -118,12 +119,32 @@ function rowToChildSpan(row: ChildSpanRow): ChildSpan {
   return childSpan
 }
 
+function isHealthy(db: Database.Database): boolean {
+  const result = db.pragma('integrity_check') as Array<{ integrity_check: string }>
+  return result[0]?.integrity_check === 'ok'
+}
+
+function openDatabase(dbPath: string): { db: Database.Database; recovered: boolean } {
+  if (dbPath === ':memory:') return { db: new Database(dbPath), recovered: false }
+  try {
+    const db = new Database(dbPath)
+    if (isHealthy(db)) return { db, recovered: false }
+    db.close()
+  } catch {
+  }
+  renameSync(dbPath, `${dbPath}.corrupt-${Date.now()}`)
+  return { db: new Database(dbPath), recovered: true }
+}
+
 export class SpanStore {
   private readonly db: Database.Database
   private readonly retentionRows: number
+  readonly recoveredFromCorruption: boolean
 
   constructor(dbPath: string, options: { retentionRows?: number } = {}) {
-    this.db = new Database(dbPath)
+    const opened = openDatabase(dbPath)
+    this.db = opened.db
+    this.recoveredFromCorruption = opened.recovered
     this.db.pragma('journal_mode = WAL')
     this.db.exec(schema)
     this.retentionRows = options.retentionRows ?? 50000
