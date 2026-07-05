@@ -1,6 +1,8 @@
 import { build, type Histogram } from 'hdr-histogram-js'
 import type { LoadRunResult, LoadScenario, SampleEntry, WorkerDoneMessage } from './types'
 
+const maxRetainedTraceIds = 1000
+
 function createHistogram(): Histogram {
   return build({
     lowestDiscernibleValue: 1,
@@ -22,12 +24,17 @@ export class RunAggregator {
   private readonly targetHistograms: Histogram[]
   private readonly targetCounts: number[]
   private readonly statusDistribution: Record<string, number> = {}
+  private readonly generatedTraceIds: string[] = []
+  private generatedTraceIdCount = 0
   private totalRequests = 0
   private errorCount = 0
   private eventLoopLagP99Ms = 0
   private maxScheduleDeviationMs = 0
 
-  constructor(private readonly scenario: LoadScenario) {
+  constructor(
+    private readonly scenario: LoadScenario,
+    private readonly runId: string
+  ) {
     this.targetHistograms = scenario.targets.map(() => createHistogram())
     this.targetCounts = scenario.targets.map(() => 0)
   }
@@ -43,6 +50,10 @@ export class RunAggregator {
       const statusKey = String(entry.statusCode)
       this.statusDistribution[statusKey] = (this.statusDistribution[statusKey] ?? 0) + 1
       if (entry.errorMessage !== undefined || entry.statusCode >= 500 || entry.statusCode === 0) this.errorCount += 1
+      if (entry.traceId !== undefined) {
+        this.generatedTraceIdCount += 1
+        if (this.generatedTraceIds.length < maxRetainedTraceIds) this.generatedTraceIds.push(entry.traceId)
+      }
     }
   }
 
@@ -69,6 +80,7 @@ export class RunAggregator {
         : null
     return {
       name: this.scenario.name,
+      runId: this.runId,
       aborted: input.aborted,
       degraded: input.degraded,
       totalRequests: this.totalRequests,
@@ -99,7 +111,8 @@ export class RunAggregator {
       workerHealth: {
         eventLoopLagP99Ms: this.eventLoopLagP99Ms,
         maxScheduleDeviationMs: this.maxScheduleDeviationMs
-      }
+      },
+      generatedTraceIds: { count: this.generatedTraceIdCount, sample: this.generatedTraceIds }
     }
   }
 }

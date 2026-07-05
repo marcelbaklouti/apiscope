@@ -26,6 +26,7 @@ describe('assertAllowedTarget', () => {
 function result(overrides: Partial<LoadRunResult>): LoadRunResult {
   return {
     name: 'run',
+    runId: 'run0run0run0run0',
     aborted: false,
     degraded: false,
     totalRequests: 1000,
@@ -38,6 +39,7 @@ function result(overrides: Partial<LoadRunResult>): LoadRunResult {
     achievedRps: 98.5,
     durationMs: 10000,
     workerHealth: { eventLoopLagP99Ms: 3, maxScheduleDeviationMs: 6 },
+    generatedTraceIds: { count: 0, sample: [] },
     ...overrides
   }
 }

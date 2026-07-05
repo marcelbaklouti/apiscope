@@ -2,6 +2,7 @@ import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { pathToFileURL } from 'node:url'
 import { Pool } from 'undici'
 import type { Dispatcher } from 'undici'
+import { formatTraceparent, newSpanId, newTraceId } from '@apiscope/core'
 import type { LoadTarget, SampleEntry, WorkerInput, WorkerMessage } from './types'
 
 interface PreparedRequest {
@@ -48,6 +49,7 @@ async function loadHooks(hooksModule: string | undefined): Promise<Hooks> {
 
 export async function runWorkerLoop(input: WorkerInput, emit: (message: WorkerMessage) => void): Promise<void> {
   const { scenario, workerIndex, workerCount } = input
+  const runId = input.runId ?? newTraceId().slice(0, 16)
   const hooks = await loadHooks(scenario.hooksModule)
   const pool = new Pool(scenario.baseUrl, { connections: 128 })
   const lagMonitor = monitorEventLoopDelay({ resolution: 10 })
@@ -88,6 +90,7 @@ export async function runWorkerLoop(input: WorkerInput, emit: (message: WorkerMe
       ...(target.headers === undefined ? {} : { headers: target.headers }),
       ...(target.body === undefined ? {} : { body: target.body })
     }
+    let requestTraceId = ''
     try {
       if (hooks.beforeRequest !== undefined) {
         const replaced = await hooks.beforeRequest(prepared, {
@@ -97,6 +100,14 @@ export async function runWorkerLoop(input: WorkerInput, emit: (message: WorkerMe
         })
         if (replaced !== undefined) prepared = replaced
       }
+      requestTraceId = newTraceId()
+      const requestSpanId = newSpanId()
+      const injectedHeaders: Record<string, string> = {
+        ...(prepared.headers ?? {}),
+        traceparent: formatTraceparent({ traceId: requestTraceId, spanId: requestSpanId, sampled: true }),
+        'apiscope-load-run': runId
+      }
+      prepared = { ...prepared, headers: injectedHeaders }
       const response = await pool.request({
         method: prepared.method as Dispatcher.HttpMethod,
         path: prepared.path,
@@ -105,7 +116,10 @@ export async function runWorkerLoop(input: WorkerInput, emit: (message: WorkerMe
       })
       await response.body.dump()
       const completedAt = performance.now()
-      record({ latencyMs: completedAt - intendedAt, statusCode: response.statusCode, targetIndex }, completedAt)
+      record(
+        { latencyMs: completedAt - intendedAt, statusCode: response.statusCode, targetIndex, traceId: requestTraceId },
+        completedAt
+      )
     } catch (error) {
       const completedAt = performance.now()
       record(
@@ -113,7 +127,8 @@ export async function runWorkerLoop(input: WorkerInput, emit: (message: WorkerMe
           latencyMs: completedAt - intendedAt,
           statusCode: 0,
           targetIndex,
-          errorMessage: error instanceof Error ? error.message : String(error)
+          errorMessage: error instanceof Error ? error.message : String(error),
+          ...(requestTraceId === '' ? {} : { traceId: requestTraceId })
         },
         completedAt
       )

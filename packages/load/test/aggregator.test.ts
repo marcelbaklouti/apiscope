@@ -18,7 +18,7 @@ function samples(latencies: number[], targetIndex: number, statusCode = 200): Sa
 
 describe('RunAggregator', () => {
   it('aggregates latency percentiles, statuses and per-target breakdowns', () => {
-    const aggregator = new RunAggregator(scenario)
+    const aggregator = new RunAggregator(scenario, 'run1run1run1run1')
     aggregator.addSamples(samples([10, 20, 30, 40, 50, 60, 70, 80, 90, 100], 0))
     aggregator.addSamples(samples([200], 1, 500))
     aggregator.addSamples([{ latencyMs: 300, statusCode: 0, targetIndex: 1, errorMessage: 'ECONNREFUSED' }])
@@ -37,10 +37,15 @@ describe('RunAggregator', () => {
     expect(result.targetRps).toBe(100)
     expect(result.achievedRps).toBeCloseTo(6)
     expect(result.workerHealth).toEqual({ eventLoopLagP99Ms: 9, maxScheduleDeviationMs: 12 })
+    expect(result.runId).toBe('run1run1run1run1')
+    expect(result.generatedTraceIds).toEqual({ count: 0, sample: [] })
   })
 
   it('reports null targetRps for closed models', () => {
-    const aggregator = new RunAggregator({ ...scenario, model: { kind: 'closed', concurrency: 5, durationMs: 1000 } })
+    const aggregator = new RunAggregator(
+      { ...scenario, model: { kind: 'closed', concurrency: 5, durationMs: 1000 } },
+      'run2run2run2run2'
+    )
     const result = aggregator.finish({ aborted: true, degraded: true, durationMs: 1000 })
     expect(result.targetRps).toBeNull()
     expect(result.aborted).toBe(true)

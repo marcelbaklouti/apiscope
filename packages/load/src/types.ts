@@ -32,6 +32,7 @@ export interface SampleEntry {
   statusCode: number
   targetIndex: number
   errorMessage?: string
+  traceId?: string
 }
 
 export interface WorkerSampleMessage {
@@ -57,6 +58,7 @@ export interface WorkerInput {
   scenario: LoadScenario
   workerIndex: number
   workerCount: number
+  runId?: string
 }
 
 export interface LatencySummary {
@@ -72,6 +74,7 @@ export interface LatencySummary {
 
 export interface LoadRunResult {
   name: string
+  runId: string
   aborted: boolean
   degraded: boolean
   totalRequests: number
@@ -84,6 +87,7 @@ export interface LoadRunResult {
   achievedRps: number
   durationMs: number
   workerHealth: { eventLoopLagP99Ms: number; maxScheduleDeviationMs: number }
+  generatedTraceIds: { count: number; sample: string[] }
 }
 
 export interface LoadAssertions {

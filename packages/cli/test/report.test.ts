@@ -11,6 +11,7 @@ import {
 
 const result: LoadRunResult = {
   name: 'smoke',
+  runId: 'run0run0run0run0',
   aborted: false,
   degraded: false,
   totalRequests: 200,
@@ -22,7 +23,8 @@ const result: LoadRunResult = {
   targetRps: 100,
   achievedRps: 99.1,
   durationMs: 2000,
-  workerHealth: { eventLoopLagP99Ms: 2, maxScheduleDeviationMs: 4 }
+  workerHealth: { eventLoopLagP99Ms: 2, maxScheduleDeviationMs: 4 },
+  generatedTraceIds: { count: 0, sample: [] }
 }
 
 const input: CiReportInput = {

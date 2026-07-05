@@ -15,6 +15,7 @@ import {
 function result(p95: number, errorRate: number): LoadRunResult {
   return {
     name: 'smoke',
+    runId: 'run0run0run0run0',
     aborted: false,
     degraded: false,
     totalRequests: 100,
@@ -26,7 +27,8 @@ function result(p95: number, errorRate: number): LoadRunResult {
     targetRps: 50,
     achievedRps: 49,
     durationMs: 2000,
-    workerHealth: { eventLoopLagP99Ms: 1, maxScheduleDeviationMs: 2 }
+    workerHealth: { eventLoopLagP99Ms: 1, maxScheduleDeviationMs: 2 },
+    generatedTraceIds: { count: 0, sample: [] }
   }
 }
 

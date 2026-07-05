@@ -130,3 +130,44 @@ describe('runWorkerLoop hooks', () => {
     expect(seenPaths.every((path) => path.startsWith('/dynamic/'))).toBe(true)
   })
 })
+
+describe('runWorkerLoop trace context injection', () => {
+  it('injects traceparent and load-run headers, after hooks run', async () => {
+    const seen: Array<{ traceparent: string; loadRun: string }> = []
+    const baseUrl = await startTarget((request, response) => {
+      seen.push({
+        traceparent: String(request.headers.traceparent ?? ''),
+        loadRun: String(request.headers['apiscope-load-run'] ?? '')
+      })
+      response.writeHead(200)
+      response.end('ok')
+    })
+    const hooksDir = mkdtempSync(join(tmpdir(), 'apiscope-hooks-'))
+    const hooksPath = join(hooksDir, 'hooks.mjs')
+    writeFileSync(
+      hooksPath,
+      "export function beforeRequest(request) { return { ...request, headers: { ...(request.headers ?? {}), traceparent: 'should-be-overridden', 'apiscope-load-run': 'should-be-overridden' } } }\n"
+    )
+    const scenario: LoadScenario = {
+      name: 'trace-injection',
+      baseUrl,
+      targets: [{ method: 'GET', path: '/' }],
+      model: { kind: 'open', phases: [{ durationMs: 200, rps: 10 }] },
+      hooksModule: hooksPath
+    }
+    const messages: WorkerMessage[] = []
+    await runWorkerLoop({ scenario, workerIndex: 0, workerCount: 1, runId: 'run1run1run1run1' }, (message) =>
+      messages.push(message)
+    )
+    expect(seen.length).toBeGreaterThan(0)
+    for (const entry of seen) {
+      expect(entry.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
+      expect(entry.loadRun).toBe('run1run1run1run1')
+    }
+    const traceIds = new Set(seen.map((entry) => entry.traceparent.split('-')[1]))
+    expect(traceIds.size).toBe(seen.length)
+    const samples = collectSamples(messages)
+    expect(samples.length).toBe(seen.length)
+    expect(samples.every((sample) => sample.traceId !== undefined && /^[0-9a-f]{32}$/.test(sample.traceId))).toBe(true)
+  })
+})

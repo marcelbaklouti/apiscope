@@ -1,4 +1,5 @@
 import { Worker } from 'node:worker_threads'
+import { newTraceId } from '@apiscope/core'
 import { RunAggregator } from './aggregator'
 import { assertAllowedTarget } from './safety'
 import { runWorkerLoop } from './worker-loop'
@@ -33,10 +34,11 @@ export async function runLoadTestInProcess(
   callbacks: RunCallbacks = {}
 ): Promise<LoadRunResult> {
   assertAllowedTarget(scenario.baseUrl, scenario.allowRemoteHosts)
-  const aggregator = new RunAggregator(scenario)
+  const runId = newTraceId().slice(0, 16)
+  const aggregator = new RunAggregator(scenario, runId)
   const state = { fatal: null as string | null, lastWindowAllErrors: false }
   const startedAt = performance.now()
-  await runWorkerLoop({ scenario, workerIndex: 0, workerCount: 1 }, (message) =>
+  await runWorkerLoop({ scenario, workerIndex: 0, workerCount: 1, runId }, (message) =>
     handleMessage(message, aggregator, callbacks, state)
   )
   return aggregator.finish({
@@ -49,7 +51,8 @@ export async function runLoadTestInProcess(
 export async function runLoadTest(scenario: LoadScenario, callbacks: RunCallbacks = {}): Promise<LoadRunResult> {
   assertAllowedTarget(scenario.baseUrl, scenario.allowRemoteHosts)
   const workerCount = Math.max(1, scenario.workers ?? 1)
-  const aggregator = new RunAggregator(scenario)
+  const runId = newTraceId().slice(0, 16)
+  const aggregator = new RunAggregator(scenario, runId)
   const state = { fatal: null as string | null, lastWindowAllErrors: false }
   const startedAt = performance.now()
   let degraded = false
@@ -57,7 +60,7 @@ export async function runLoadTest(scenario: LoadScenario, callbacks: RunCallback
   const spawnWorker = (workerIndex: number, allowRestart: boolean): Promise<void> =>
     new Promise((resolve) => {
       const worker = new Worker(new URL('./worker.js', import.meta.url), {
-        workerData: { scenario, workerIndex, workerCount }
+        workerData: { scenario, workerIndex, workerCount, runId }
       })
       worker.on('message', (message: WorkerMessage) => handleMessage(message, aggregator, callbacks, state))
       worker.on('error', () => {
