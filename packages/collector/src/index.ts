@@ -2,6 +2,7 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { IngestProcessor } from './ingest'
 import { LiveHub } from './live-hub'
 import { SpanStore } from './store'
+import { attachWebSockets } from './websocket'
 import { createHttpServer, readBody, sendJson, type CollectorOptions, type RouteHandler } from './server'
 
 export type { CollectorOptions }
@@ -10,6 +11,7 @@ export type { RouteStats } from './store'
 export { LiveHub } from './live-hub'
 export type { LiveEvent } from './live-hub'
 export { IngestProcessor } from './ingest'
+export { attachWebSockets } from './websocket'
 
 export interface Collector {
   listen(): Promise<{ host: string; port: number }>
@@ -54,6 +56,7 @@ export function createCollector(options: CollectorOptions): Collector {
     else sendJson(response, 200, detail)
     return true
   })
+  attachWebSockets(server, processor, hub)
   return {
     store,
     hub,
