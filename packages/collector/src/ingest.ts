@@ -10,7 +10,9 @@ export interface IngestSession {
   authenticatedApp?: string | null
 }
 
-export type IngestResult = { ok: true; appName: string } | { ok: false; error: DecodeError | { kind: 'missing-app' } }
+export type IngestResult =
+  | { ok: true; appName: string }
+  | { ok: false; error: DecodeError | { kind: 'missing-app' } | { kind: 'unsupported-on-ingest-channel' } }
 
 export class IngestProcessor {
   constructor(
@@ -25,6 +27,9 @@ export class IngestProcessor {
     const decoded = decodeWireMessage(raw)
     if (!decoded.ok) return { ok: false, error: decoded.error }
     const message = decoded.message
+    if (message.type === 'profile-request' || message.type === 'profile-result') {
+      return { ok: false, error: { kind: 'unsupported-on-ingest-channel' } }
+    }
     if (message.type === 'handshake') {
       const app =
         session.authenticatedApp !== undefined && session.authenticatedApp !== null && session.authenticatedApp !== ''

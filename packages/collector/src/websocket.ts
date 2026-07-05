@@ -4,13 +4,15 @@ import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/
 import { IngestProcessor, type IngestSession } from './ingest'
 import type { LiveTransport } from './live/live-transport'
 import type { CollectorMetrics } from './metrics'
+import type { ProfileChannelRegistry } from './profiles/registry'
 
 export function attachWebSockets(
   server: Server,
   processor: IngestProcessor,
   hub: LiveTransport,
   ingestAuth: IngestAuthenticator = createNoneIngestAuthenticator(),
-  metrics?: CollectorMetrics
+  metrics?: CollectorMetrics,
+  profileChannel?: ProfileChannelRegistry
 ): void {
   const ingestServer = new WebSocketServer({ noServer: true })
   const liveServer = new WebSocketServer({ noServer: true })
@@ -20,13 +22,18 @@ export function attachWebSockets(
     const authenticatedApp = (request as { apiscopeAuthenticatedApp?: string | null }).apiscopeAuthenticatedApp ?? null
     const session: IngestSession = { appName: null, authenticatedApp }
     socket.on('message', (data) => {
+      if (profileChannel?.handleInboundMessage(String(data)) === true) return
       void processor.process(String(data), session).then((result) => {
+        if (result.ok && session.appName !== null) profileChannel?.registerApp(session.appName, socket)
         if (result.ok) socket.send(JSON.stringify({ accepted: true }))
         else socket.send(JSON.stringify({ error: result.error }))
       })
     })
     socket.on('close', () => {
-      if (session.appName !== null) hub.publish({ type: 'app-disconnected', appName: session.appName })
+      if (session.appName !== null) {
+        hub.publish({ type: 'app-disconnected', appName: session.appName })
+        profileChannel?.unregisterApp(session.appName)
+      }
     })
   })
 

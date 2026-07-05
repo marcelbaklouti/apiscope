@@ -67,3 +67,11 @@ export interface RouteRegistryEntry {
   pattern: string
   sourceFile?: string
 }
+
+export interface FlameNode {
+  name: string
+  file: string
+  line: number
+  value: number
+  children: FlameNode[]
+}

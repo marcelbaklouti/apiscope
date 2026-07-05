@@ -10,6 +10,8 @@ import { createMetrics } from './metrics'
 import { createOtlpExporter } from './otlp/exporter'
 import { createOtlpGrpcServer } from './otlp/receiver-grpc'
 import { createOtlpHttpHandler } from './otlp/receiver-http'
+import { ProfileChannelRegistry, type ProfileResult } from './profiles/registry'
+import { ProfileResultStore } from './profiles/store'
 import { createKeepAllSampler } from './sampling/sampler'
 import { createStaticHandler } from './static'
 import { SqliteSpanStore } from './store'
@@ -36,6 +38,8 @@ export { createKeepAllSampler, createTailSampler } from './sampling/sampler'
 export type { Sampler, TailSamplerOptions } from './sampling/sampler'
 export { createMetrics } from './metrics'
 export type { CollectorMetrics } from './metrics'
+export type { ProfileResult } from './profiles/registry'
+export type { StoredProfile } from './profiles/store'
 
 export interface Collector {
   listen(): Promise<{ host: string; port: number }>
@@ -43,6 +47,8 @@ export interface Collector {
   store: SpanStore
   hub: LiveTransport
   otlpGrpcPort?: number
+  connectedApp(appName: string): string | null
+  requestProfile(appName: string, durationMs: number): Promise<ProfileResult>
 }
 
 const N_PLUS_ONE_RECENT_SPAN_WINDOW = 200
@@ -155,6 +161,8 @@ export function createCollector(options: CollectorOptions): Collector {
   const metrics = createMetrics()
   const exporter = options.otlpExport === undefined ? undefined : createOtlpExporter(options.otlpExport)
   const processor = new IngestProcessor(store, hub, sampler, metrics, exporter)
+  const profileChannel = new ProfileChannelRegistry()
+  const profileResults = new ProfileResultStore()
   const ingestAuth = options.ingestAuth ?? createNoneIngestAuthenticator()
   const dashboardAuth = options.dashboardAuth ?? createInlineNoneDashboardAuthenticator()
   if (dashboardAuth.mode === 'none' && !isLoopbackHost(host) && options.allowInsecure !== true) {
@@ -202,6 +210,30 @@ export function createCollector(options: CollectorOptions): Collector {
       sendJson(response, 400, { error: error instanceof Error ? error.message : 'invalid request' })
     }
   })
+  routes.set('POST /api/profiles', async (request, response) => {
+    const raw = await readBody(request)
+    try {
+      const { appName, durationMs } = JSON.parse(raw) as { appName?: string; durationMs?: number }
+      if (typeof appName !== 'string' || appName === '') throw new Error('appName is required')
+      if (typeof durationMs !== 'number' || durationMs <= 0) throw new Error('durationMs must be a positive number')
+      const result = await profileChannel.requestProfile(appName, durationMs)
+      if (!result.ok || result.flamegraph === undefined || result.pprofBase64 === undefined) {
+        sendJson(response, 502, { error: result.error ?? 'profile capture failed' })
+        return
+      }
+      const profileId = `profile-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      profileResults.put({
+        id: profileId,
+        appName,
+        capturedAt: Date.now(),
+        flamegraph: result.flamegraph,
+        pprofBase64: result.pprofBase64
+      })
+      sendJson(response, 202, { profileId })
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : 'invalid request' })
+    }
+  })
   const spanDetailHandler: DynamicHandler = async (request, response, url) => {
     const match = url.pathname.match(/^\/api\/spans\/([^/]+)$/)
     if (request.method !== 'GET' || match === null || match[1] === undefined) return false
@@ -233,6 +265,29 @@ export function createCollector(options: CollectorOptions): Collector {
     })
     return true
   }
+  const profileDetailHandler: DynamicHandler = (request, response, url) => {
+    const match = url.pathname.match(/^\/api\/profiles\/([^/]+)$/)
+    if (request.method !== 'GET' || match === null || match[1] === undefined) return false
+    const stored = profileResults.get(decodeURIComponent(match[1]))
+    if (stored === null) sendJson(response, 404, { error: 'not-found' })
+    else sendJson(response, 200, { id: stored.id, appName: stored.appName, capturedAt: stored.capturedAt, flamegraph: stored.flamegraph })
+    return true
+  }
+  const profilePprofHandler: DynamicHandler = (request, response, url) => {
+    const match = url.pathname.match(/^\/api\/profiles\/([^/]+)\/pprof$/)
+    if (request.method !== 'GET' || match === null || match[1] === undefined) return false
+    const stored = profileResults.get(decodeURIComponent(match[1]))
+    if (stored === null) {
+      sendJson(response, 404, { error: 'not-found' })
+      return true
+    }
+    response.writeHead(200, {
+      'content-type': 'application/octet-stream',
+      'content-disposition': `attachment; filename="${stored.id}.pprof"`
+    })
+    response.end(Buffer.from(stored.pprofBase64, 'base64'))
+    return true
+  }
   const otlpHttpHandler: DynamicHandler | null =
     options.otlpIngest?.http === true
       ? createOtlpHttpHandler({
@@ -244,6 +299,8 @@ export function createCollector(options: CollectorOptions): Collector {
   const dynamicHandlers: DynamicHandler[] = [
     spanDetailHandler,
     loadRunDetailHandler,
+    profilePprofHandler,
+    profileDetailHandler,
     ...(otlpHttpHandler === null ? [] : [otlpHttpHandler]),
     ...(options.dashboardDir === undefined ? [] : [createStaticHandler(options.dashboardDir)])
   ]
@@ -253,7 +310,7 @@ export function createCollector(options: CollectorOptions): Collector {
   }
   const guardedDynamicHandlers = dynamicHandlers.map((handler) => wrapDynamicWithDashboardGuard(handler, dashboardAuth))
   const server: Server = createHttpServer(guardedRoutes, guardedDynamicHandlers, options.tls)
-  attachWebSockets(server, processor, hub, ingestAuth, metrics)
+  attachWebSockets(server, processor, hub, ingestAuth, metrics, profileChannel)
   const otlpGrpcServer =
     options.otlpIngest?.grpc === true
       ? createOtlpGrpcServer({
@@ -266,6 +323,12 @@ export function createCollector(options: CollectorOptions): Collector {
   const collector: Collector = {
     store,
     hub,
+    connectedApp(appName: string) {
+      return profileChannel.isConnected(appName) ? appName : null
+    },
+    requestProfile(appName: string, durationMs: number) {
+      return profileChannel.requestProfile(appName, durationMs)
+    },
     async listen() {
       const address = await new Promise<{ host: string; port: number }>((resolve, reject) => {
         server.once('error', reject)

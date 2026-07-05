@@ -1,12 +1,5 @@
+import type { FlameNode } from '@apiscope/core'
 import type { CpuProfile, CpuProfileNode } from './capture'
-
-export interface FlameNode {
-  name: string
-  file: string
-  line: number
-  value: number
-  children: FlameNode[]
-}
 
 function deriveSamplingIntervalMicros(profile: CpuProfile): number {
   if (profile.samples.length === 0) return 0

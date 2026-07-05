@@ -2,9 +2,33 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { PROTOCOL_VERSION } from '../src/index'
 import { decodeWireMessage, encodeWireMessage } from '../src/protocol'
-import type { HandshakeMessage, SpanBatchMessage, WireMessage } from '../src/protocol'
-import type { RequestSpan } from '../src/types'
+import type { HandshakeMessage, ProfileRequestMessage, ProfileResultMessage, SpanBatchMessage, WireMessage } from '../src/protocol'
+import type { FlameNode, RequestSpan } from '../src/types'
 import { validChildSpan, validDbChildSpan, validRequestSpan } from './validate.test'
+
+const flamegraph: FlameNode = {
+  name: '(program)',
+  file: '',
+  line: 0,
+  value: 1200,
+  children: [{ name: 'busy', file: 'file:///app.js', line: 4, value: 1200, children: [] }]
+}
+
+const profileRequest: ProfileRequestMessage = {
+  type: 'profile-request',
+  protocolVersion: PROTOCOL_VERSION,
+  requestId: 'req-1',
+  durationMs: 500
+}
+
+const profileResult: ProfileResultMessage = {
+  type: 'profile-result',
+  protocolVersion: PROTOCOL_VERSION,
+  requestId: 'req-1',
+  ok: true,
+  flamegraph,
+  pprofBase64: 'AAA='
+}
 
 const handshake: HandshakeMessage = {
   type: 'handshake',
@@ -26,12 +50,47 @@ describe('encodeWireMessage and decodeWireMessage', () => {
     const messages: WireMessage[] = [
       handshake,
       batch,
-      { type: 'registry-update', protocolVersion: PROTOCOL_VERSION, routes: [{ method: 'POST', pattern: '/users', sourceFile: 'src/users.ts' }] }
+      { type: 'registry-update', protocolVersion: PROTOCOL_VERSION, routes: [{ method: 'POST', pattern: '/users', sourceFile: 'src/users.ts' }] },
+      profileRequest,
+      profileResult,
+      { type: 'profile-result', protocolVersion: PROTOCOL_VERSION, requestId: 'req-2', ok: false, error: 'profiler unavailable' }
     ]
     for (const message of messages) {
       const decoded = decodeWireMessage(encodeWireMessage(message))
       expect(decoded).toEqual({ ok: true, message })
     }
+  })
+
+  it('rejects a profile-request missing requestId or durationMs', () => {
+    const decoded = decodeWireMessage(
+      JSON.stringify({ type: 'profile-request', protocolVersion: PROTOCOL_VERSION, requestId: '', durationMs: -1 })
+    )
+    expect(decoded).toEqual({
+      ok: false,
+      error: {
+        kind: 'invalid-shape',
+        issues: [
+          { path: 'requestId', expected: 'non-empty string' },
+          { path: 'durationMs', expected: 'positive number' }
+        ]
+      }
+    })
+  })
+
+  it('rejects a profile-result with a malformed nested flamegraph', () => {
+    const decoded = decodeWireMessage(
+      JSON.stringify({
+        type: 'profile-result',
+        protocolVersion: PROTOCOL_VERSION,
+        requestId: 'req-3',
+        ok: true,
+        flamegraph: { name: '(program)', file: '', line: 0, value: 'not-a-number', children: [] }
+      })
+    )
+    expect(decoded).toEqual({
+      ok: false,
+      error: { kind: 'invalid-shape', issues: [{ path: 'flamegraph.value', expected: 'number' }] }
+    })
   })
 
   it('round-trips a span batch carrying a db child span', () => {
@@ -62,7 +121,10 @@ describe('encodeWireMessage and decodeWireMessage', () => {
     const decoded = decodeWireMessage(JSON.stringify({ type: 'nope', protocolVersion: PROTOCOL_VERSION }))
     expect(decoded).toEqual({
       ok: false,
-      error: { kind: 'invalid-shape', issues: [{ path: 'type', expected: 'handshake | span-batch | registry-update' }] }
+      error: {
+        kind: 'invalid-shape',
+        issues: [{ path: 'type', expected: 'handshake | span-batch | registry-update | profile-request | profile-result' }]
+      }
     })
   })
 

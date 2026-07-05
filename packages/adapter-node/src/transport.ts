@@ -1,16 +1,44 @@
 import WebSocket from 'ws'
 import {
   PROTOCOL_VERSION,
+  decodeWireMessage,
   encodeWireMessage,
   type AppMetadata,
   type RouteRegistryEntry,
   type SpanBatchPayload
 } from '@apiscope/core'
+import { captureCpuProfile } from './profiling/capture'
+import { buildFlamegraph } from './profiling/flamegraph'
+import { cpuProfileToPprof } from './profiling/pprof'
 
 export interface CollectorTransportOptions {
   collectorUrl: string
   app: AppMetadata
   reconnectDelayMs?: number
+}
+
+async function handleProfileRequest(requestId: string, durationMs: number): Promise<string> {
+  try {
+    const profile = await captureCpuProfile(durationMs)
+    const flamegraph = buildFlamegraph(profile)
+    const pprofBytes = cpuProfileToPprof(profile)
+    return encodeWireMessage({
+      type: 'profile-result',
+      protocolVersion: PROTOCOL_VERSION,
+      requestId,
+      ok: true,
+      flamegraph,
+      pprofBase64: Buffer.from(pprofBytes).toString('base64')
+    })
+  } catch (error) {
+    return encodeWireMessage({
+      type: 'profile-result',
+      protocolVersion: PROTOCOL_VERSION,
+      requestId,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    })
+  }
 }
 
 export class CollectorTransport {
@@ -93,7 +121,12 @@ export class CollectorTransport {
         })
       )
     })
-    socket.on('message', () => {})
+    socket.on('message', (data) => {
+      const decoded = decodeWireMessage(String(data))
+      if (!decoded.ok || decoded.message.type !== 'profile-request') return
+      const { requestId, durationMs } = decoded.message
+      void handleProfileRequest(requestId, durationMs).then((payload) => this.sendRaw(payload))
+    })
     socket.on('error', () => {})
     socket.on('close', () => {
       this.socket = null
