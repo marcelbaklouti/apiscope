@@ -1,4 +1,4 @@
-import type { RouteEntry, RouteStatsEntry, RunDetail, RunSummary, Span, SpanDetail, StoredProfile } from './types'
+import type { DependencyGraph, RouteEntry, RouteStatsEntry, RunDetail, RunSummary, Span, SpanDetail, StoredProfile } from './types'
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path)
@@ -35,5 +35,6 @@ export const api = {
     return (await response.json()) as { profileId: string }
   },
   profileById: (id: string) => getJson<StoredProfile>(`/api/profiles/${encodeURIComponent(id)}`),
-  profilePprofUrl: (id: string) => `/api/profiles/${encodeURIComponent(id)}/pprof`
+  profilePprofUrl: (id: string) => `/api/profiles/${encodeURIComponent(id)}/pprof`,
+  dependencies: () => getJson<DependencyGraph>('/api/dependencies')
 }

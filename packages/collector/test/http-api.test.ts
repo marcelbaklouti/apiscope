@@ -157,4 +157,52 @@ describe('HTTP ingest and read APIs', () => {
     const postsRoute = routes.find((route) => route.pattern === '/api/posts')
     expect(postsRoute?.nPlusOneRequests).toBe(1)
   })
+
+  it('exposes a dependency graph over recent spans and their children', async () => {
+    const baseUrl = await startCollector()
+    await fetch(`${baseUrl}/ingest`, {
+      method: 'POST',
+      body: encodeWireMessage({
+        type: 'handshake',
+        protocolVersion: PROTOCOL_VERSION,
+        app: { name: 'deps-app', framework: 'express', runtime: 'node' },
+        routes: [{ method: 'GET', pattern: '/api/orders' }]
+      })
+    })
+    const depsSpan: RequestSpan = { ...sampleSpan, id: 'deps1', method: 'GET', routePattern: '/api/orders', actualPath: '/api/orders' }
+    const dbChild: DbChildSpan = {
+      id: 'deps-db-1',
+      parentSpanId: 'deps1',
+      traceId: 't1',
+      kind: 'db',
+      system: 'postgresql',
+      statement: 'SELECT * FROM orders WHERE id = ?',
+      operation: 'SELECT',
+      target: 'appdb',
+      rowCount: 1,
+      timing: { start: 0, ttfb: null, duration: 3 }
+    }
+    await fetch(`${baseUrl}/ingest`, {
+      method: 'POST',
+      headers: { 'x-apiscope-app': 'deps-app' },
+      body: encodeWireMessage({
+        type: 'span-batch',
+        protocolVersion: PROTOCOL_VERSION,
+        spans: [depsSpan],
+        childSpans: [dbChild as ChildSpan],
+        droppedCount: 0
+      })
+    })
+    const graph = (await (await fetch(`${baseUrl}/api/dependencies`)).json()) as {
+      nodes: Array<{ id: string; kind: string; label: string }>
+      edges: Array<{ from: string; to: string; count: number; p95Ms: number }>
+    }
+    const routeNode = graph.nodes.find((node) => node.kind === 'route' && node.label === 'GET /api/orders')
+    const dbNode = graph.nodes.find((node) => node.kind === 'db')
+    expect(routeNode).toBeDefined()
+    expect(dbNode?.label).toBe('postgresql appdb')
+    const edge = graph.edges.find((entry) => entry.from === routeNode?.id && entry.to === dbNode?.id)
+    expect(edge?.count).toBe(1)
+    expect(edge?.p95Ms).toBe(3)
+  })
 })

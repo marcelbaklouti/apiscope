@@ -1,4 +1,5 @@
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
+import { buildDependencyGraph, type SpanWithChildren } from './analysis/dependencies'
 import { detectNPlusOne } from './analysis/nplusone'
 import { createDashboardAuthenticator, type DashboardAuthenticator } from './auth/dashboard-auth'
 import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/ingest-auth'
@@ -52,6 +53,18 @@ export interface Collector {
 }
 
 const N_PLUS_ONE_RECENT_SPAN_WINDOW = 200
+const DEPENDENCY_GRAPH_RECENT_SPAN_WINDOW = 200
+
+async function loadRecentSpansWithChildren(store: SpanStore, limit: number): Promise<SpanWithChildren[]> {
+  const recentSpans = await store.recentSpans(limit)
+  const spansWithChildren: SpanWithChildren[] = []
+  for (const span of recentSpans) {
+    const detail = await store.spanById(span.id)
+    if (detail === null) continue
+    spansWithChildren.push({ span: detail.span, childSpans: detail.childSpans })
+  }
+  return spansWithChildren
+}
 
 async function countNPlusOneRequestsByRoute(store: SpanStore): Promise<Map<string, number>> {
   const recentSpans = await store.recentSpans(N_PLUS_ONE_RECENT_SPAN_WINDOW)
@@ -198,6 +211,10 @@ export function createCollector(options: CollectorOptions): Collector {
     sendJson(response, 200, withIndicator)
   })
   routes.set('GET /api/route-stats', async (request, response) => sendJson(response, 200, await store.routeStats()))
+  routes.set('GET /api/dependencies', async (request, response) => {
+    const spansWithChildren = await loadRecentSpansWithChildren(store, DEPENDENCY_GRAPH_RECENT_SPAN_WINDOW)
+    sendJson(response, 200, buildDependencyGraph(spansWithChildren))
+  })
   routes.set('GET /api/meta', (request, response) => sendJson(response, 200, { meta: options.meta ?? null }))
   routes.set('GET /api/load-runs', async (request, response) => sendJson(response, 200, await store.listLoadRuns()))
   routes.set('POST /api/load-runs', async (request, response) => {

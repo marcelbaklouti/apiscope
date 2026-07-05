@@ -60,3 +60,21 @@ export interface StoredProfile {
   capturedAt: number
   flamegraph: FlameNode
 }
+
+export interface DependencyNode {
+  id: string
+  kind: 'route' | 'db' | 'http'
+  label: string
+}
+
+export interface DependencyEdge {
+  from: string
+  to: string
+  count: number
+  p95Ms: number
+}
+
+export interface DependencyGraph {
+  nodes: DependencyNode[]
+  edges: DependencyEdge[]
+}
