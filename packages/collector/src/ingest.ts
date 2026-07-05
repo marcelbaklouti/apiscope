@@ -1,5 +1,6 @@
-import { decodeWireMessage, type DecodeError } from '@apiscope/core'
+import { decodeWireMessage, type DecodeError, type RequestSpan } from '@apiscope/core'
 import { LiveHub } from './live-hub'
+import type { Sampler } from './sampling/sampler'
 import type { SpanStore } from './store-interface'
 
 export interface IngestSession {
@@ -12,7 +13,8 @@ export type IngestResult = { ok: true; appName: string } | { ok: false; error: D
 export class IngestProcessor {
   constructor(
     private readonly store: SpanStore,
-    private readonly hub: LiveHub
+    private readonly hub: LiveHub,
+    private readonly sampler: Sampler
   ) {}
 
   async process(raw: string, session: IngestSession): Promise<IngestResult> {
@@ -41,9 +43,24 @@ export class IngestProcessor {
       this.hub.publish({ type: 'registry', appName, routes: message.routes })
       return { ok: true, appName }
     }
-    await this.store.insertBatch(appName, { spans: message.spans, childSpans: message.childSpans })
-    this.hub.publish({ type: 'spans', appName, spans: message.spans, childSpans: message.childSpans })
-    if (message.droppedCount > 0) this.hub.publish({ type: 'dropped', appName, droppedCount: message.droppedCount })
+    const keptSpans: RequestSpan[] = []
+    const keptIds = new Set<string>()
+    let droppedBySampler = 0
+    for (const span of message.spans) {
+      if (this.sampler.keep(span)) {
+        keptSpans.push(span)
+        keptIds.add(span.id)
+      } else {
+        droppedBySampler += 1
+      }
+    }
+    const keptChildSpans = message.childSpans.filter((child) => keptIds.has(child.parentSpanId))
+    await this.store.insertBatch(appName, { spans: keptSpans, childSpans: keptChildSpans })
+    if (keptSpans.length > 0 || keptChildSpans.length > 0) {
+      this.hub.publish({ type: 'spans', appName, spans: keptSpans, childSpans: keptChildSpans })
+    }
+    const totalDropped = message.droppedCount + droppedBySampler
+    if (totalDropped > 0) this.hub.publish({ type: 'dropped', appName, droppedCount: totalDropped })
     return { ok: true, appName }
   }
 }

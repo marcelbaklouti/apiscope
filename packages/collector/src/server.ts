@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type RequestListener, type Server, 
 import { createServer as createHttpsServer } from 'node:https'
 import type { DashboardAuthenticator } from './auth/dashboard-auth'
 import type { IngestAuthenticator } from './auth/ingest-auth'
+import type { Sampler } from './sampling/sampler'
 import type { SpanStore } from './store-interface'
 
 export interface TlsOptions {
@@ -21,6 +22,7 @@ export interface CollectorOptions {
   store?: SpanStore
   ingestAuth?: IngestAuthenticator
   dashboardAuth?: DashboardAuthenticator
+  sampler?: Sampler
   tls?: TlsOptions
   allowInsecure?: boolean
 }

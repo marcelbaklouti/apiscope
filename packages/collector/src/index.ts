@@ -4,6 +4,7 @@ import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/
 import { IngestProcessor } from './ingest'
 import { LiveHub } from './live-hub'
 import { startLoadRun, type LoadRunRequest } from './load-runs'
+import { createKeepAllSampler } from './sampling/sampler'
 import { createStaticHandler } from './static'
 import { SqliteSpanStore } from './store'
 import type { SpanStore } from './store-interface'
@@ -23,6 +24,8 @@ export { createNoneIngestAuthenticator, createTokenIngestAuthenticator } from '.
 export type { IngestAuthenticator, IngestIdentity, TokenEntry } from './auth/ingest-auth'
 export { createDashboardAuthenticator } from './auth/dashboard-auth'
 export type { DashboardAuthenticator, DashboardIdentity, DashboardAuthConfig } from './auth/dashboard-auth'
+export { createKeepAllSampler, createTailSampler } from './sampling/sampler'
+export type { Sampler, TailSamplerOptions } from './sampling/sampler'
 
 export interface Collector {
   listen(): Promise<{ host: string; port: number }>
@@ -119,7 +122,8 @@ export function createCollector(options: CollectorOptions): Collector {
   const storeOptions = options.retentionRows === undefined ? {} : { retentionRows: options.retentionRows }
   const store = options.store ?? new SqliteSpanStore(options.dbPath, storeOptions)
   const hub = new LiveHub()
-  const processor = new IngestProcessor(store, hub)
+  const sampler = options.sampler ?? createKeepAllSampler()
+  const processor = new IngestProcessor(store, hub, sampler)
   const ingestAuth = options.ingestAuth ?? createNoneIngestAuthenticator()
   const dashboardAuth = options.dashboardAuth ?? createInlineNoneDashboardAuthenticator()
   if (dashboardAuth.mode === 'none' && !isLoopbackHost(host) && options.allowInsecure !== true) {

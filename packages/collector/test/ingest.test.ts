@@ -3,6 +3,7 @@ import { encodeWireMessage, PROTOCOL_VERSION } from '@apiscope/core'
 import type { RequestSpan } from '@apiscope/core'
 import { IngestProcessor } from '../src/ingest'
 import { LiveHub } from '../src/live-hub'
+import { createKeepAllSampler } from '../src/sampling/sampler'
 import { SqliteSpanStore } from '../src/store'
 
 const sampleSpan: RequestSpan = {
@@ -22,7 +23,7 @@ function setup() {
   const hub = new LiveHub()
   const events: unknown[] = []
   hub.subscribe((event) => events.push(event))
-  return { processor: new IngestProcessor(store, hub), store, events }
+  return { processor: new IngestProcessor(store, hub, createKeepAllSampler()), store, events }
 }
 
 describe('IngestProcessor', () => {
