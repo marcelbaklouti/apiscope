@@ -1,0 +1,96 @@
+import type { Express, NextFunction, Request, RequestHandler, Response } from 'express'
+import { AdapterRuntime, subscribeUndici, type AdapterRuntimeOptions } from '@apiscope/adapter-node'
+import { extractExpressRoutes } from './routes'
+
+export { extractExpressRoutes } from './routes'
+
+export type ExpressAdapterOptions = Omit<AdapterRuntimeOptions, 'framework' | 'transport'> & {
+  runtime?: AdapterRuntime
+}
+
+function flattenHeaders(headers: Record<string, string | string[] | number | undefined>): Record<string, string> {
+  const flattened: Record<string, string> = {}
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === undefined) continue
+    flattened[name] = Array.isArray(value) ? value.join(', ') : String(value)
+  }
+  return flattened
+}
+
+export function apiscopeExpress(options: ExpressAdapterOptions): RequestHandler {
+  const runtime =
+    options.runtime ??
+    new AdapterRuntime({
+      appName: options.appName,
+      framework: 'express',
+      ...(options.collectorUrl === undefined ? {} : { collectorUrl: options.collectorUrl }),
+      ...(options.capture === undefined ? {} : { capture: options.capture }),
+      ...(options.additionalRedactedHeaders === undefined
+        ? {}
+        : { additionalRedactedHeaders: options.additionalRedactedHeaders })
+    })
+  runtime.start()
+  subscribeUndici(runtime)
+  let registryPushed = false
+
+  return (request: Request, response: Response, next: NextFunction) => {
+    try {
+      if (!registryPushed) {
+        registryPushed = true
+        runtime.setRoutes(extractExpressRoutes(request.app as Express))
+      }
+      const context = runtime.newIds()
+      const startedAtWall = Date.now()
+      const startedAt = performance.now()
+      let ttfb: number | null = null
+      const responseChunks: Buffer[] = []
+      const originalWriteHead = response.writeHead.bind(response)
+      response.writeHead = ((...writeHeadArguments: Parameters<Response['writeHead']>) => {
+        if (ttfb === null) ttfb = performance.now() - startedAt
+        return originalWriteHead(...writeHeadArguments)
+      }) as Response['writeHead']
+      const originalWrite = response.write.bind(response)
+      response.write = ((chunk: unknown, ...rest: unknown[]) => {
+        if (chunk !== undefined && chunk !== null) responseChunks.push(Buffer.from(chunk as Buffer | string))
+        return (originalWrite as (...writeArguments: unknown[]) => boolean)(chunk, ...rest)
+      }) as Response['write']
+      const originalEnd = response.end.bind(response)
+      response.end = ((chunk?: unknown, ...rest: unknown[]) => {
+        if (chunk !== undefined && chunk !== null && typeof chunk !== 'function') {
+          responseChunks.push(Buffer.from(chunk as Buffer | string))
+        }
+        return (originalEnd as (...endArguments: unknown[]) => Response)(chunk, ...rest)
+      }) as Response['end']
+      response.on('finish', () => {
+        try {
+          const routePath = (request as Request & { route?: { path: string } }).route?.path
+          const routePattern = routePath === undefined ? null : `${request.baseUrl}${routePath}`.replace(/\/{2,}/g, '/')
+          const requestPayload = runtime.capturePayload(
+            flattenHeaders(request.headers),
+            request.body === undefined ? undefined : JSON.stringify(request.body)
+          )
+          const responsePayload = runtime.capturePayload(
+            flattenHeaders(response.getHeaders() as Record<string, string | string[] | number | undefined>),
+            responseChunks.length === 0 ? undefined : Buffer.concat(responseChunks).toString('utf8')
+          )
+          runtime.recordSpan({
+            id: context.spanId,
+            traceId: context.traceId,
+            method: request.method,
+            routePattern,
+            actualPath: request.originalUrl.split('?')[0] ?? request.originalUrl,
+            statusCode: response.statusCode,
+            timing: { start: startedAtWall, ttfb, duration: performance.now() - startedAt },
+            framework: 'express',
+            runtime: 'node',
+            ...(requestPayload === undefined ? {} : { request: requestPayload }),
+            ...(responsePayload === undefined ? {} : { response: responsePayload })
+          })
+        } catch {}
+      })
+      runtime.runWithSpan(context, () => next())
+    } catch {
+      next()
+    }
+  }
+}
