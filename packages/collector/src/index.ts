@@ -1,4 +1,5 @@
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
+import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/ingest-auth'
 import { IngestProcessor } from './ingest'
 import { LiveHub } from './live-hub'
 import { startLoadRun, type LoadRunRequest } from './load-runs'
@@ -17,6 +18,8 @@ export { IngestProcessor } from './ingest'
 export { attachWebSockets } from './websocket'
 export { resolveStore } from './store-factory'
 export type { StorageConfig } from './store-factory'
+export { createNoneIngestAuthenticator, createTokenIngestAuthenticator } from './auth/ingest-auth'
+export type { IngestAuthenticator, IngestIdentity, TokenEntry } from './auth/ingest-auth'
 
 export interface Collector {
   listen(): Promise<{ host: string; port: number }>
@@ -25,11 +28,19 @@ export interface Collector {
   hub: LiveHub
 }
 
-function handleIngest(processor: IngestProcessor) {
+function handleIngest(processor: IngestProcessor, ingestAuth: IngestAuthenticator) {
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
+    const identity = ingestAuth.authenticate(request)
+    if (identity === null) {
+      sendJson(response, 401, { error: 'unauthorized' })
+      return
+    }
     const raw = await readBody(request)
     const headerApp = request.headers['x-apiscope-app']
-    const session = { appName: typeof headerApp === 'string' ? headerApp : null }
+    const session = {
+      appName: typeof headerApp === 'string' ? headerApp : null,
+      authenticatedApp: identity.appName === '' ? null : identity.appName
+    }
     const result = await processor.process(raw, session)
     if (result.ok) sendJson(response, 202, { accepted: true })
     else sendJson(response, 400, { error: result.error })
@@ -43,9 +54,10 @@ export function createCollector(options: CollectorOptions): Collector {
   const store = options.store ?? new SqliteSpanStore(options.dbPath, storeOptions)
   const hub = new LiveHub()
   const processor = new IngestProcessor(store, hub)
+  const ingestAuth = options.ingestAuth ?? createNoneIngestAuthenticator()
   const routes = new Map<string, RouteHandler>()
   routes.set('GET /health', (request, response) => sendJson(response, 200, { status: 'ok' }))
-  routes.set('POST /ingest', handleIngest(processor))
+  routes.set('POST /ingest', handleIngest(processor, ingestAuth))
   routes.set('GET /api/spans', async (request, response, url) => {
     const requested = Number(url.searchParams.get('limit') ?? '100')
     const limit = Number.isFinite(requested) ? Math.min(Math.max(1, requested), 1000) : 100
@@ -102,7 +114,7 @@ export function createCollector(options: CollectorOptions): Collector {
     ...(options.dashboardDir === undefined ? [] : [createStaticHandler(options.dashboardDir)])
   ]
   const server: Server = createHttpServer(routes, dynamicHandlers)
-  attachWebSockets(server, processor, hub)
+  attachWebSockets(server, processor, hub, ingestAuth)
   return {
     store,
     hub,

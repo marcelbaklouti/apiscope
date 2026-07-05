@@ -3,5 +3,6 @@ packages:
   - packages/next/fixtures/*
 
 onlyBuiltDependencies:
+  - argon2
   - better-sqlite3
   - esbuild

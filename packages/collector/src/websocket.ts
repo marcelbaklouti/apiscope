@@ -1,14 +1,21 @@
 import type { Server } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
+import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/ingest-auth'
 import { IngestProcessor, type IngestSession } from './ingest'
 import { LiveHub } from './live-hub'
 
-export function attachWebSockets(server: Server, processor: IngestProcessor, hub: LiveHub): void {
+export function attachWebSockets(
+  server: Server,
+  processor: IngestProcessor,
+  hub: LiveHub,
+  ingestAuth: IngestAuthenticator = createNoneIngestAuthenticator()
+): void {
   const ingestServer = new WebSocketServer({ noServer: true })
   const liveServer = new WebSocketServer({ noServer: true })
 
-  ingestServer.on('connection', (socket: WebSocket) => {
-    const session: IngestSession = { appName: null }
+  ingestServer.on('connection', (socket: WebSocket, request) => {
+    const authenticatedApp = (request as { apiscopeAuthenticatedApp?: string | null }).apiscopeAuthenticatedApp ?? null
+    const session: IngestSession = { appName: null, authenticatedApp }
     socket.on('message', (data) => {
       void processor.process(String(data), session).then((result) => {
         if (result.ok) socket.send(JSON.stringify({ accepted: true }))
@@ -30,6 +37,13 @@ export function attachWebSockets(server: Server, processor: IngestProcessor, hub
   server.on('upgrade', (request, socket, head) => {
     const url = new URL(request.url ?? '/', 'http://localhost')
     if (url.pathname === '/ws/ingest') {
+      const identity = ingestAuth.authenticate(request)
+      if (identity === null) {
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+        socket.destroy()
+        return
+      }
+      ;(request as { apiscopeAuthenticatedApp?: string | null }).apiscopeAuthenticatedApp = identity.appName === '' ? null : identity.appName
       ingestServer.handleUpgrade(request, socket, head, (client) => ingestServer.emit('connection', client, request))
     } else if (url.pathname === '/ws/live') {
       liveServer.handleUpgrade(request, socket, head, (client) => liveServer.emit('connection', client, request))

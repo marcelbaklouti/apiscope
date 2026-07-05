@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 import { encodeWireMessage, PROTOCOL_VERSION } from '@apiscope/core'
 import type { RequestSpan } from '@apiscope/core'
+import { createTokenIngestAuthenticator } from '../src/auth/ingest-auth'
 import { createCollector, type Collector } from '../src/index'
 
 let collector: Collector
@@ -102,5 +103,12 @@ describe('WebSocket ingest and live subscriptions', () => {
     collector = createCollector({ dbPath: ':memory:', port: 0 })
     const { port } = await collector.listen()
     await expect(connect(`ws://127.0.0.1:${port}/ws/unknown`)).rejects.toThrow()
+  })
+
+  it('refuses an unauthenticated ingest upgrade when a token authenticator is configured', async () => {
+    const ingestAuth = createTokenIngestAuthenticator([{ appName: 'web', token: 'secret-token' }])
+    collector = createCollector({ dbPath: ':memory:', port: 0, ingestAuth })
+    const { port } = await collector.listen()
+    await expect(connect(`ws://127.0.0.1:${port}/ws/ingest`)).rejects.toThrow()
   })
 })
