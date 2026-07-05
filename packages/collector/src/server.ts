@@ -1,6 +1,15 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import { createServer, type IncomingMessage, type RequestListener, type Server, type ServerResponse } from 'node:http'
+import { createServer as createHttpsServer } from 'node:https'
+import type { DashboardAuthenticator } from './auth/dashboard-auth'
 import type { IngestAuthenticator } from './auth/ingest-auth'
 import type { SpanStore } from './store-interface'
+
+export interface TlsOptions {
+  key: string
+  cert: string
+  ca?: string
+  requestCert?: boolean
+}
 
 export interface CollectorOptions {
   dbPath: string
@@ -11,6 +20,9 @@ export interface CollectorOptions {
   meta?: unknown
   store?: SpanStore
   ingestAuth?: IngestAuthenticator
+  dashboardAuth?: DashboardAuthenticator
+  tls?: TlsOptions
+  allowInsecure?: boolean
 }
 
 export type RouteHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => void | Promise<void>
@@ -29,8 +41,8 @@ export async function readBody(request: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-export function createHttpServer(routes: Map<string, RouteHandler>, dynamicHandlers: DynamicHandler[] = []): Server {
-  return createServer(async (request, response) => {
+export function createRequestListener(routes: Map<string, RouteHandler>, dynamicHandlers: DynamicHandler[] = []): RequestListener {
+  return async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost')
     const handler = routes.get(`${request.method} ${url.pathname}`)
     if (handler) {
@@ -45,5 +57,24 @@ export function createHttpServer(routes: Map<string, RouteHandler>, dynamicHandl
       if (await dynamicHandler(request, response, url)) return
     }
     sendJson(response, 404, { error: 'not-found' })
-  })
+  }
+}
+
+export function createHttpServer(
+  routes: Map<string, RouteHandler>,
+  dynamicHandlers: DynamicHandler[] = [],
+  tls?: TlsOptions
+): Server {
+  const requestListener = createRequestListener(routes, dynamicHandlers)
+  if (tls === undefined) return createServer(requestListener)
+  return createHttpsServer(
+    {
+      key: tls.key,
+      cert: tls.cert,
+      ...(tls.ca === undefined ? {} : { ca: tls.ca }),
+      requestCert: tls.requestCert ?? false,
+      rejectUnauthorized: tls.requestCert ?? false
+    },
+    requestListener
+  )
 }

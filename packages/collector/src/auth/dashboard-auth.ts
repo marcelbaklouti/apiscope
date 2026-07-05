@@ -16,6 +16,7 @@ export interface DashboardAuthenticator {
   authenticate(request: IncomingMessage): Promise<DashboardIdentity | null>
   routes: Map<string, RouteHandler>
   requiresLoginRedirect: boolean
+  readonly mode: DashboardAuthConfig['mode']
 }
 
 export type DashboardAuthConfig =
@@ -70,7 +71,8 @@ export async function createDashboardAuthenticator(config: DashboardAuthConfig):
         return { subject: 'anonymous', displayName: 'anonymous' }
       },
       routes: new Map(),
-      requiresLoginRedirect: false
+      requiresLoginRedirect: false,
+      mode: 'none'
     }
   }
 
@@ -83,7 +85,8 @@ export async function createDashboardAuthenticator(config: DashboardAuthConfig):
         return { subject, displayName }
       },
       routes: new Map(),
-      requiresLoginRedirect: false
+      requiresLoginRedirect: false,
+      mode: 'proxy'
     }
   }
 
@@ -119,7 +122,8 @@ export async function createDashboardAuthenticator(config: DashboardAuthConfig):
         return codec.verify(token)
       },
       routes,
-      requiresLoginRedirect: true
+      requiresLoginRedirect: true,
+      mode: 'password'
     }
   }
 
@@ -178,6 +182,7 @@ export async function createDashboardAuthenticator(config: DashboardAuthConfig):
       return codec.verify(token)
     },
     routes,
-    requiresLoginRedirect: true
+    requiresLoginRedirect: true,
+    mode: 'oidc'
   }
 }

@@ -1,4 +1,5 @@
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
+import { createDashboardAuthenticator, type DashboardAuthenticator } from './auth/dashboard-auth'
 import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/ingest-auth'
 import { IngestProcessor } from './ingest'
 import { LiveHub } from './live-hub'
@@ -20,6 +21,8 @@ export { resolveStore } from './store-factory'
 export type { StorageConfig } from './store-factory'
 export { createNoneIngestAuthenticator, createTokenIngestAuthenticator } from './auth/ingest-auth'
 export type { IngestAuthenticator, IngestIdentity, TokenEntry } from './auth/ingest-auth'
+export { createDashboardAuthenticator } from './auth/dashboard-auth'
+export type { DashboardAuthenticator, DashboardIdentity, DashboardAuthConfig } from './auth/dashboard-auth'
 
 export interface Collector {
   listen(): Promise<{ host: string; port: number }>
@@ -47,6 +50,69 @@ function handleIngest(processor: IngestProcessor, ingestAuth: IngestAuthenticato
   }
 }
 
+function createInlineNoneDashboardAuthenticator(): DashboardAuthenticator {
+  return {
+    async authenticate() {
+      return { subject: 'anonymous', displayName: 'anonymous' }
+    },
+    routes: new Map(),
+    requiresLoginRedirect: false,
+    mode: 'none'
+  }
+}
+
+function isLoopbackHost(host: string): boolean {
+  return host === '127.0.0.1' || host === 'localhost' || host === '::1'
+}
+
+const guardExemptRoutes = new Set(['GET /health', 'POST /ingest', 'GET /api/session'])
+
+function isGuardExemptRoute(route: string, dashboardAuth: DashboardAuthenticator): boolean {
+  if (guardExemptRoutes.has(route)) return true
+  return dashboardAuth.routes.has(route)
+}
+
+function requiresDashboardIdentity(pathname: string): boolean {
+  return pathname.startsWith('/api/') || !pathname.startsWith('/auth/')
+}
+
+async function respondUnauthenticated(response: ServerResponse, pathname: string, dashboardAuth: DashboardAuthenticator): Promise<void> {
+  if (pathname.startsWith('/api/')) {
+    sendJson(response, 401, { error: 'unauthorized' })
+    return
+  }
+  if (dashboardAuth.requiresLoginRedirect) {
+    response.writeHead(302, { location: '/auth/login' })
+    response.end()
+    return
+  }
+  sendJson(response, 401, { error: 'unauthorized' })
+}
+
+function wrapWithDashboardGuard(route: string, handler: RouteHandler, dashboardAuth: DashboardAuthenticator): RouteHandler {
+  if (isGuardExemptRoute(route, dashboardAuth)) return handler
+  return async (request, response, url) => {
+    const identity = await dashboardAuth.authenticate(request)
+    if (identity === null) {
+      await respondUnauthenticated(response, url.pathname, dashboardAuth)
+      return
+    }
+    await handler(request, response, url)
+  }
+}
+
+function wrapDynamicWithDashboardGuard(handler: DynamicHandler, dashboardAuth: DashboardAuthenticator): DynamicHandler {
+  return async (request, response, url) => {
+    if (!requiresDashboardIdentity(url.pathname)) return handler(request, response, url)
+    const identity = await dashboardAuth.authenticate(request)
+    if (identity === null) {
+      await respondUnauthenticated(response, url.pathname, dashboardAuth)
+      return true
+    }
+    return handler(request, response, url)
+  }
+}
+
 export function createCollector(options: CollectorOptions): Collector {
   const host = options.host ?? '127.0.0.1'
   const port = options.port ?? 4620
@@ -55,8 +121,19 @@ export function createCollector(options: CollectorOptions): Collector {
   const hub = new LiveHub()
   const processor = new IngestProcessor(store, hub)
   const ingestAuth = options.ingestAuth ?? createNoneIngestAuthenticator()
+  const dashboardAuth = options.dashboardAuth ?? createInlineNoneDashboardAuthenticator()
+  if (dashboardAuth.mode === 'none' && !isLoopbackHost(host) && options.allowInsecure !== true) {
+    throw new Error('refusing to start: dashboard auth is "none" on a non-loopback host; set allowInsecure to override (insecure)')
+  }
   const routes = new Map<string, RouteHandler>()
   routes.set('GET /health', (request, response) => sendJson(response, 200, { status: 'ok' }))
+  routes.set('GET /api/session', async (request, response) => {
+    const identity = await dashboardAuth.authenticate(request)
+    sendJson(response, 200, identity === null ? { authenticated: false } : { authenticated: true, identity })
+  })
+  for (const [route, handler] of dashboardAuth.routes) {
+    routes.set(route, handler)
+  }
   routes.set('POST /ingest', handleIngest(processor, ingestAuth))
   routes.set('GET /api/spans', async (request, response, url) => {
     const requested = Number(url.searchParams.get('limit') ?? '100')
@@ -113,7 +190,12 @@ export function createCollector(options: CollectorOptions): Collector {
     loadRunDetailHandler,
     ...(options.dashboardDir === undefined ? [] : [createStaticHandler(options.dashboardDir)])
   ]
-  const server: Server = createHttpServer(routes, dynamicHandlers)
+  const guardedRoutes = new Map<string, RouteHandler>()
+  for (const [route, handler] of routes) {
+    guardedRoutes.set(route, wrapWithDashboardGuard(route, handler, dashboardAuth))
+  }
+  const guardedDynamicHandlers = dynamicHandlers.map((handler) => wrapDynamicWithDashboardGuard(handler, dashboardAuth))
+  const server: Server = createHttpServer(guardedRoutes, guardedDynamicHandlers, options.tls)
   attachWebSockets(server, processor, hub, ingestAuth)
   return {
     store,
