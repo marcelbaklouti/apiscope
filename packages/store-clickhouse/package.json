@@ -1,0 +1,41 @@
+{
+  "name": "@apiscope/store-clickhouse",
+  "version": "0.0.0",
+  "license": "MIT",
+  "description": "ClickHouse span store for apiscope",
+  "repository": { "type": "git", "url": "git+https://github.com/marcelbaklouti/apiscope.git", "directory": "packages/store-clickhouse" },
+  "homepage": "https://github.com/marcelbaklouti/apiscope#readme",
+  "bugs": "https://github.com/marcelbaklouti/apiscope/issues",
+  "keywords": ["apiscope", "api", "monitoring", "load-testing", "devtools", "clickhouse"],
+  "publishConfig": { "access": "public" },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@apiscope/core": "workspace:*",
+    "@apiscope/collector": "workspace:*",
+    "@clickhouse/client": "^1.23.0"
+  },
+  "devDependencies": {
+    "@apiscope/collector": "workspace:*",
+    "@testcontainers/clickhouse": "^12.0.4",
+    "@types/node": "^26.1.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9"
+  }
+}

@@ -110,6 +110,7 @@ apiscope ci --json report.json --junit report.xml
 | --- | --- |
 | `@apiscope/core` | Span model and wire protocol for apiscope |
 | `@apiscope/collector` | Local collector daemon with SQLite store and live streaming |
+| `@apiscope/store-clickhouse` | ClickHouse span store for apiscope |
 | `@apiscope/adapter-node` | Shared Node.js adapter runtime with span context and undici capture |
 | `@apiscope/express` | Express adapter for apiscope |
 | `@apiscope/fastify` | Fastify adapter for apiscope |
