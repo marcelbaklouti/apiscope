@@ -1,5 +1,7 @@
 import type { ChildSpan, RequestSpan, RouteRegistryEntry } from '@apiscope/core'
-import type { LoadRunResult, LoadScenario } from '@apiscope/load'
+import type { GeneratedScenario, LoadRunResult, LoadScenario } from '@apiscope/load'
+
+export type { GeneratedScenario }
 
 export type Span = RequestSpan
 export type Child = ChildSpan

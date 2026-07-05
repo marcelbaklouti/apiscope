@@ -1,4 +1,5 @@
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
+import { generateScenario } from '@apiscope/load'
 import { buildDependencyGraph, type SpanWithChildren } from './analysis/dependencies'
 import { detectNPlusOne } from './analysis/nplusone'
 import { createDashboardAuthenticator, type DashboardAuthenticator } from './auth/dashboard-auth'
@@ -54,6 +55,8 @@ export interface Collector {
 
 const N_PLUS_ONE_RECENT_SPAN_WINDOW = 200
 const DEPENDENCY_GRAPH_RECENT_SPAN_WINDOW = 200
+const SCENARIO_RECENT_SPAN_LIMIT = 1000
+const SCENARIO_DEFAULT_WINDOW_MS = 5 * 60 * 1000
 
 async function loadRecentSpansWithChildren(store: SpanStore, limit: number): Promise<SpanWithChildren[]> {
   const recentSpans = await store.recentSpans(limit)
@@ -211,6 +214,17 @@ export function createCollector(options: CollectorOptions): Collector {
     sendJson(response, 200, withIndicator)
   })
   routes.set('GET /api/route-stats', async (request, response) => sendJson(response, 200, await store.routeStats()))
+  routes.set('GET /api/scenario', async (request, response, url) => {
+    const requestedWindowMs = Number(url.searchParams.get('windowMs') ?? String(SCENARIO_DEFAULT_WINDOW_MS))
+    const windowMs = Number.isFinite(requestedWindowMs) && requestedWindowMs > 0 ? requestedWindowMs : SCENARIO_DEFAULT_WINDOW_MS
+    const baseUrl = url.searchParams.get('baseUrl') ?? 'http://127.0.0.1:3000'
+    const shapeParam = url.searchParams.get('shape')
+    const shape = shapeParam === 'ramp' ? 'ramp' : 'steady'
+    const cutoff = Date.now() - windowMs
+    const recentSpans = await store.recentSpans(SCENARIO_RECENT_SPAN_LIMIT)
+    const spansInWindow = recentSpans.filter((span) => span.timing.start >= cutoff)
+    sendJson(response, 200, generateScenario({ spans: spansInWindow, baseUrl, shape }))
+  })
   routes.set('GET /api/dependencies', async (request, response) => {
     const spansWithChildren = await loadRecentSpansWithChildren(store, DEPENDENCY_GRAPH_RECENT_SPAN_WINDOW)
     sendJson(response, 200, buildDependencyGraph(spansWithChildren))

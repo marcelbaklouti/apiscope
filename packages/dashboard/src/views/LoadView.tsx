@@ -57,11 +57,31 @@ export function LoadView() {
   })
   const [error, setError] = useState<string | null>(null)
   const [activeRunId, setActiveRunId] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
   const progress = useDashboardStore((state) => (activeRunId === null ? undefined : state.progressByRun[activeRunId]))
   const { navigate } = useHashRoute()
   const code = useMemo(() => configCode(builder), [builder])
 
   const update = (patch: Partial<BuilderState>) => setBuilder((current) => ({ ...current, ...patch }))
+
+  const generateFromTraffic = async () => {
+    setError(null)
+    setGenerating(true)
+    try {
+      const generated = await api.scenario({ baseUrl: builder.baseUrl })
+      const topTarget = [...generated.scenario.targets].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))[0]
+      const firstPhase = generated.scenario.model.kind === 'open' ? generated.scenario.model.phases[0] : undefined
+      update({
+        ...(topTarget === undefined ? {} : { method: topTarget.method, path: topTarget.path }),
+        ...(firstPhase === undefined ? {} : { rps: firstPhase.rps }),
+        ...(generated.assertions.p95MaxMs === undefined ? {} : { p95MaxMs: String(Math.round(generated.assertions.p95MaxMs)) })
+      })
+    } catch (generateError) {
+      setError(generateError instanceof Error ? generateError.message : String(generateError))
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   const start = async () => {
     setError(null)
@@ -122,6 +142,9 @@ export function LoadView() {
             p95 budget ms{' '}
             <input value={builder.p95MaxMs} onChange={(event) => update({ p95MaxMs: event.target.value })} />
           </label>
+          <button onClick={() => void generateFromTraffic()} disabled={generating} data-testid="generate-from-traffic">
+            {generating ? 'generating…' : 'generate from traffic'}
+          </button>
           <button className="primary" onClick={() => void start()} data-testid="start-run">
             start run
           </button>

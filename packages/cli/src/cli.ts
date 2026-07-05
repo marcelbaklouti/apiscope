@@ -20,13 +20,18 @@ import {
 } from '@apiscope/collector'
 import { runCi } from './ci'
 import { ConfigError, loadConfig, type ApiscopeConfig, type OtlpConfig, type ProductionConfig } from './config'
+import { generateScenarioCommand } from './generate-scenario'
 import { resolveSecret } from './secrets'
 
 export type CliInvocation =
   | { command: 'dev'; configPath: string | null }
   | { command: 'serve'; configPath: string | null }
   | { command: 'ci'; configPath: string | null; updateBaseline: boolean; jsonPath?: string; junitPath?: string }
+  | { command: 'generate-scenario'; configPath: string | null; window: string; baseUrl: string; shape: 'steady' | 'ramp'; out: string }
   | { command: 'help' }
+
+const defaultGenerateScenarioWindow = '5m'
+const defaultGenerateScenarioOut = './apiscope.config.ts'
 
 export function parseCliArgs(argv: string[]): CliInvocation {
   const { values, positionals } = parseArgs({
@@ -37,6 +42,10 @@ export function parseCliArgs(argv: string[]): CliInvocation {
       'update-baseline': { type: 'boolean', default: false },
       json: { type: 'string' },
       junit: { type: 'string' },
+      window: { type: 'string' },
+      'base-url': { type: 'string' },
+      shape: { type: 'string' },
+      out: { type: 'string' },
       help: { type: 'boolean', default: false }
     }
   })
@@ -54,6 +63,17 @@ export function parseCliArgs(argv: string[]): CliInvocation {
       ...(values.junit === undefined ? {} : { junitPath: values.junit })
     }
   }
+  if (command === 'generate-scenario') {
+    if (values['base-url'] === undefined) return { command: 'help' }
+    return {
+      command: 'generate-scenario',
+      configPath,
+      window: values.window ?? defaultGenerateScenarioWindow,
+      baseUrl: values['base-url'],
+      shape: values.shape === 'ramp' ? 'ramp' : 'steady',
+      out: values.out ?? defaultGenerateScenarioOut
+    }
+  }
   return { command: 'help' }
 }
 
@@ -66,16 +86,20 @@ usage:
     --update-baseline                   write a new baseline instead of checking
     --json path                         write a json report
     --junit path                        write a junit xml report
+  apiscope generate-scenario --base-url <url>   turn observed traffic into a scenario
+    --window duration                   how far back to look, e.g. 5m (default 5m)
+    --shape steady|ramp                 load shape (default steady)
+    --out path                          config file to write (default ./apiscope.config.ts)
   apiscope --help
 `
 
-async function resolveConfig(configPath: string | null, cwd: string): Promise<ApiscopeConfig> {
+export async function resolveConfig(configPath: string | null, cwd: string): Promise<ApiscopeConfig> {
   const effectivePath = configPath ?? join(cwd, 'apiscope.config.ts')
   if (configPath === null && !existsSync(effectivePath)) return {}
   return loadConfig(effectivePath)
 }
 
-async function resolveStorage(storage: StorageConfig | undefined): Promise<SpanStore | undefined> {
+export async function resolveStorage(storage: StorageConfig | undefined): Promise<SpanStore | undefined> {
   if (storage === undefined) return undefined
   if (storage.driver === 'sqlite') return resolveStore(storage)
   return resolveStore({
@@ -250,6 +274,10 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     }
     if (invocation.command === 'serve') {
       await runServe(invocation.configPath)
+      return
+    }
+    if (invocation.command === 'generate-scenario') {
+      await generateScenarioCommand(invocation, process.cwd())
       return
     }
     const cwd = process.cwd()

@@ -33,4 +33,38 @@ describe('parseCliArgs', () => {
       configPath: './apiscope.config.ts'
     })
   })
+
+  it('parses generate-scenario with flags', () => {
+    expect(
+      parseCliArgs([
+        'generate-scenario',
+        '--window',
+        '5m',
+        '--base-url',
+        'http://localhost:3000',
+        '--shape',
+        'ramp',
+        '--out',
+        './apiscope.config.ts'
+      ])
+    ).toEqual({
+      command: 'generate-scenario',
+      configPath: null,
+      window: '5m',
+      baseUrl: 'http://localhost:3000',
+      shape: 'ramp',
+      out: './apiscope.config.ts'
+    })
+  })
+
+  it('parses generate-scenario with defaults', () => {
+    expect(parseCliArgs(['generate-scenario', '--base-url', 'http://localhost:3000'])).toEqual({
+      command: 'generate-scenario',
+      configPath: null,
+      window: '5m',
+      baseUrl: 'http://localhost:3000',
+      shape: 'steady',
+      out: './apiscope.config.ts'
+    })
+  })
 })

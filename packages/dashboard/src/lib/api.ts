@@ -1,4 +1,14 @@
-import type { DependencyGraph, RouteEntry, RouteStatsEntry, RunDetail, RunSummary, Span, SpanDetail, StoredProfile } from './types'
+import type {
+  DependencyGraph,
+  GeneratedScenario,
+  RouteEntry,
+  RouteStatsEntry,
+  RunDetail,
+  RunSummary,
+  Span,
+  SpanDetail,
+  StoredProfile
+} from './types'
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path)
@@ -36,5 +46,11 @@ export const api = {
   },
   profileById: (id: string) => getJson<StoredProfile>(`/api/profiles/${encodeURIComponent(id)}`),
   profilePprofUrl: (id: string) => `/api/profiles/${encodeURIComponent(id)}/pprof`,
-  dependencies: () => getJson<DependencyGraph>('/api/dependencies')
+  dependencies: () => getJson<DependencyGraph>('/api/dependencies'),
+  scenario: (params: { baseUrl: string; windowMs?: number; shape?: 'steady' | 'ramp' }) => {
+    const query = new URLSearchParams({ baseUrl: params.baseUrl })
+    if (params.windowMs !== undefined) query.set('windowMs', String(params.windowMs))
+    if (params.shape !== undefined) query.set('shape', params.shape)
+    return getJson<GeneratedScenario>(`/api/scenario?${query.toString()}`)
+  }
 }
