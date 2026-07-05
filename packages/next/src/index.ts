@@ -1,2 +1,5 @@
 export { scanNextRoutes, matchRoutePattern } from './scanner'
 export { subscribeHttpServer } from './server-spans'
+export { watchRoutes } from './watcher'
+export { withApiscope } from './instrumentation'
+export type { NextAdapterOptions, NextRequestErrorInfo } from './instrumentation'
