@@ -6,6 +6,8 @@ import type { RouteStats, SpanStore, StoredLoadRun, StoredLoadRunSummary } from 
 interface SpanRow {
   id: string
   trace_id: string
+  parent_span_id: string | null
+  load_run_id: string | null
   method: string
   route_pattern: string | null
   actual_path: string
@@ -38,6 +40,8 @@ const schema = `
 CREATE TABLE IF NOT EXISTS spans (
   id TEXT PRIMARY KEY,
   trace_id TEXT NOT NULL,
+  parent_span_id TEXT,
+  load_run_id TEXT,
   method TEXT NOT NULL,
   route_pattern TEXT,
   actual_path TEXT NOT NULL,
@@ -97,6 +101,8 @@ function rowToSpan(row: SpanRow): RequestSpan {
     framework: row.framework,
     runtime: row.runtime as RequestSpan['runtime']
   }
+  if (row.parent_span_id !== null) span.parentSpanId = row.parent_span_id
+  if (row.load_run_id !== null) span.loadRunId = row.load_run_id
   if (row.error_json !== null) span.error = JSON.parse(row.error_json)
   if (row.request_json !== null) span.request = JSON.parse(row.request_json)
   if (row.response_json !== null) span.response = JSON.parse(row.response_json)
@@ -154,8 +160,8 @@ export class SqliteSpanStore implements SpanStore {
   async insertBatch(appName: string, batch: { spans: RequestSpan[]; childSpans: ChildSpan[] }): Promise<void> {
     const insertSpan = this.db.prepare(
       `INSERT OR REPLACE INTO spans
-       (id, trace_id, method, route_pattern, actual_path, status_code, start_time, ttfb, duration, framework, runtime, error_json, request_json, response_json, app_name)
-       VALUES (@id, @traceId, @method, @routePattern, @actualPath, @statusCode, @start, @ttfb, @duration, @framework, @runtime, @errorJson, @requestJson, @responseJson, @appName)`
+       (id, trace_id, parent_span_id, load_run_id, method, route_pattern, actual_path, status_code, start_time, ttfb, duration, framework, runtime, error_json, request_json, response_json, app_name)
+       VALUES (@id, @traceId, @parentSpanId, @loadRunId, @method, @routePattern, @actualPath, @statusCode, @start, @ttfb, @duration, @framework, @runtime, @errorJson, @requestJson, @responseJson, @appName)`
     )
     const insertChild = this.db.prepare(
       `INSERT OR REPLACE INTO child_spans
@@ -172,6 +178,8 @@ export class SqliteSpanStore implements SpanStore {
         insertSpan.run({
           id: span.id,
           traceId: span.traceId,
+          parentSpanId: span.parentSpanId ?? null,
+          loadRunId: span.loadRunId ?? null,
           method: span.method,
           routePattern: span.routePattern,
           actualPath: span.actualPath,

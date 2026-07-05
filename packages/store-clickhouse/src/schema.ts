@@ -6,6 +6,8 @@ export function schemaStatements(database: string, retentionDays: number | null)
     `CREATE TABLE IF NOT EXISTS ${database}.spans (
       id String,
       trace_id String,
+      parent_span_id Nullable(String),
+      load_run_id Nullable(String),
       method String,
       route_pattern Nullable(String),
       actual_path String,

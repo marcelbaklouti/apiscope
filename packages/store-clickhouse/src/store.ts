@@ -20,6 +20,8 @@ export interface ClickHouseStoreOptions {
 interface SpanRow {
   id: string
   trace_id: string
+  parent_span_id: string | null
+  load_run_id: string | null
   method: string
   route_pattern: string | null
   actual_path: string
@@ -46,6 +48,8 @@ function rowToSpan(row: SpanRow): RequestSpan {
     framework: row.framework,
     runtime: row.runtime as RequestSpan['runtime']
   }
+  if (row.parent_span_id !== null) span.parentSpanId = row.parent_span_id
+  if (row.load_run_id !== null) span.loadRunId = row.load_run_id
   if (row.error_json !== null) span.error = JSON.parse(row.error_json)
   if (row.request_json !== null) span.request = JSON.parse(row.request_json)
   if (row.response_json !== null) span.response = JSON.parse(row.response_json)
@@ -86,6 +90,8 @@ export class ClickHouseSpanStore implements SpanStore {
         values: batch.spans.map((span) => ({
           id: span.id,
           trace_id: span.traceId,
+          parent_span_id: span.parentSpanId ?? null,
+          load_run_id: span.loadRunId ?? null,
           method: span.method,
           route_pattern: span.routePattern,
           actual_path: span.actualPath,

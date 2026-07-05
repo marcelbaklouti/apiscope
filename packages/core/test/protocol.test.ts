@@ -69,17 +69,22 @@ describe('encodeWireMessage and decodeWireMessage', () => {
       ttfb: fc.option(fc.integer({ min: 0 }), { nil: null }),
       duration: fc.integer({ min: 0 })
     })
-    const spanArbitrary = fc.record({
-      id: fc.string(),
-      traceId: fc.string(),
-      method: fc.constantFrom('GET', 'POST', 'PUT', 'DELETE', 'QUERY'),
-      routePattern: fc.option(fc.string(), { nil: null }),
-      actualPath: fc.string(),
-      statusCode: fc.integer({ min: 100, max: 599 }),
-      timing: timingArbitrary,
-      framework: fc.string(),
-      runtime: fc.constantFrom('node', 'bun', 'deno', 'edge')
-    })
+    const spanArbitrary = fc.record(
+      {
+        id: fc.string(),
+        traceId: fc.string(),
+        parentSpanId: fc.string(),
+        loadRunId: fc.string(),
+        method: fc.constantFrom('GET', 'POST', 'PUT', 'DELETE', 'QUERY'),
+        routePattern: fc.option(fc.string(), { nil: null }),
+        actualPath: fc.string(),
+        statusCode: fc.integer({ min: 100, max: 599 }),
+        timing: timingArbitrary,
+        framework: fc.string(),
+        runtime: fc.constantFrom('node', 'bun', 'deno', 'edge')
+      },
+      { requiredKeys: ['id', 'traceId', 'method', 'routePattern', 'actualPath', 'statusCode', 'timing', 'framework', 'runtime'] }
+    )
     fc.assert(
       fc.property(fc.array(spanArbitrary, { maxLength: 5 }), fc.nat(), (spans, droppedCount) => {
         const message: SpanBatchMessage = {

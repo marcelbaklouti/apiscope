@@ -51,6 +51,17 @@ describe('otlp mapping', () => {
     expect(childSpans[0]?.parentSpanId).toBe('aaaaaaaaaaaaaaaa')
   })
 
+  it('carries parent span id and load-run id through otlp', () => {
+    const withParent = { ...parent, parentSpanId: 'dddddddddddddddd', loadRunId: 'eeeeeeeeeeeeeeee' }
+    const request = spansToExportRequest([withParent], [], { serviceName: 'demo' })
+    const server = request.resourceSpans[0]!.scopeSpans[0]!.spans[0]!
+    expect(server.parentSpanId).toBe('dddddddddddddddd')
+    expect(server.attributes.find((attribute) => attribute.key === 'apiscope.load_run_id')?.value.stringValue).toBe('eeeeeeeeeeeeeeee')
+    const back = exportRequestToSpans(request)
+    expect(back.spans[0]?.parentSpanId).toBe('dddddddddddddddd')
+    expect(back.spans[0]?.loadRunId).toBe('eeeeeeeeeeeeeeee')
+  })
+
   it('accepts legacy attribute keys on import', () => {
     const request = spansToExportRequest([parent], [], { serviceName: 'demo' })
     const server = request.resourceSpans[0]!.scopeSpans[0]!.spans[0]!

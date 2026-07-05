@@ -33,6 +33,20 @@ describe('SqliteSpanStore', () => {
     await store.close()
   })
 
+  it('persists parent span id and load-run id, mapping absent values to undefined', async () => {
+    const store = new SqliteSpanStore(':memory:')
+    const withLinkage = span({ id: 'p-link', parentSpanId: 'dddddddddddddddd', loadRunId: 'eeeeeeeeeeeeeeee' })
+    const without = span({ id: 'p-nolink' })
+    await store.insertBatch('demo', { spans: [withLinkage, without], childSpans: [] })
+    const loadedWith = await store.spanById('p-link')
+    expect(loadedWith?.span.parentSpanId).toBe('dddddddddddddddd')
+    expect(loadedWith?.span.loadRunId).toBe('eeeeeeeeeeeeeeee')
+    const loadedWithout = await store.spanById('p-nolink')
+    expect(loadedWithout?.span.parentSpanId).toBeUndefined()
+    expect(loadedWithout?.span.loadRunId).toBeUndefined()
+    await store.close()
+  })
+
   it('returns recent spans newest first', async () => {
     const store = new SqliteSpanStore(':memory:')
     await store.insertBatch('demo', { spans: [span({ id: 'a' }), span({ id: 'b' })], childSpans: [] })

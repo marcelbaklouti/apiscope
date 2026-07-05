@@ -44,6 +44,20 @@ export function runStoreConformance(
       await store.close()
     })
 
+    it('persists spans carrying a parent span id and load-run id', async () => {
+      const store = await createStore()
+      await store.init()
+      const withLinkage = span({
+        id: 'p2',
+        parentSpanId: 'bbbbbbbbbbbbbbbb',
+        loadRunId: 'ccccccccccccccccc'
+      })
+      await store.insertBatch('demo', { spans: [withLinkage], childSpans: [] })
+      const loaded = await store.spanById('p2')
+      expect(loaded?.span).toEqual(withLinkage)
+      await store.close()
+    })
+
     it('returns recent spans newest first', async () => {
       const store = await createStore()
       await store.init()

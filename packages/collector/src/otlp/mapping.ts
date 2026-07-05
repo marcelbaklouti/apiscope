@@ -83,9 +83,11 @@ function requestSpanToOtlp(span: RequestSpan): OtlpSpan {
   ]
   if (span.routePattern !== null) attributes.push(stringAttribute('http.route', span.routePattern))
   attributes.push(intAttribute('http.response.status_code', span.statusCode))
+  if (span.loadRunId !== undefined) attributes.push(stringAttribute('apiscope.load_run_id', span.loadRunId))
   return {
     traceId: normalizeTraceId(span.traceId),
     spanId: normalizeSpanId(span.id),
+    ...(span.parentSpanId === undefined ? {} : { parentSpanId: normalizeSpanId(span.parentSpanId) }),
     name: `${span.method} ${span.routePattern ?? span.actualPath}`,
     kind: 2,
     startTimeUnixNano: millisToNano(start),
@@ -164,6 +166,9 @@ export function exportRequestToSpans(request: OtlpExportTraceServiceRequest): {
             framework: findString(otlpSpan.attributes, 'apiscope.framework') ?? 'otlp',
             runtime: (findString(otlpSpan.attributes, 'apiscope.runtime') as RequestSpan['runtime']) ?? 'node'
           }
+          if (otlpSpan.parentSpanId !== undefined) requestSpan.parentSpanId = otlpSpan.parentSpanId
+          const loadRunId = findString(otlpSpan.attributes, 'apiscope.load_run_id')
+          if (loadRunId !== undefined) requestSpan.loadRunId = loadRunId
           if (otlpSpan.status?.code === 2) {
             requestSpan.error = { message: otlpSpan.status.message ?? 'error' }
           }
