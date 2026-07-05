@@ -159,7 +159,8 @@ export function createCollector(options: CollectorOptions): Collector {
   routes.set('GET /api/spans', async (request, response, url) => {
     const requested = Number(url.searchParams.get('limit') ?? '100')
     const limit = Number.isFinite(requested) ? Math.min(Math.max(1, requested), 1000) : 100
-    sendJson(response, 200, await store.recentSpans(limit))
+    const loadRunId = url.searchParams.get('loadRunId')
+    sendJson(response, 200, loadRunId === null ? await store.recentSpans(limit) : await store.spansByLoadRun(loadRunId, limit))
   })
   routes.set('GET /api/routes', async (request, response) => sendJson(response, 200, await store.listRoutes()))
   routes.set('GET /api/route-stats', async (request, response) => sendJson(response, 200, await store.routeStats()))

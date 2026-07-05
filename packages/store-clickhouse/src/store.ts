@@ -170,6 +170,15 @@ export class ClickHouseSpanStore implements SpanStore {
     return ((await result.json()) as SpanRow[]).map(rowToSpan)
   }
 
+  async spansByLoadRun(loadRunId: string, limit: number): Promise<RequestSpan[]> {
+    const result = await this.client.query({
+      query: `SELECT * FROM ${this.database}.spans WHERE load_run_id = {loadRunId:String} ORDER BY start_time DESC, id DESC LIMIT {limit:UInt32}`,
+      query_params: { loadRunId, limit },
+      format: 'JSONEachRow'
+    })
+    return ((await result.json()) as SpanRow[]).map(rowToSpan)
+  }
+
   async spanById(id: string): Promise<{ span: RequestSpan; childSpans: ChildSpan[] } | null> {
     const spanResult = await this.client.query({
       query: `SELECT * FROM ${this.database}.spans WHERE id = {id:String} LIMIT 1`,

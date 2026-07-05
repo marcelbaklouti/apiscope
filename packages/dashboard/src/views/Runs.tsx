@@ -102,6 +102,11 @@ export function Runs({ runId }: { runId: string | null }) {
               {detail.result.targetRps !== null && ` of ${detail.result.targetRps} target`}
             </p>
             <p className="metric">
+              <Link to={`/inspector/run/${detail.result.runId}`} data-testid="view-run-spans">
+                view spans from this run
+              </Link>
+            </p>
+            <p className="metric">
               worker health: event loop lag p99 {detail.result.workerHealth.eventLoopLagP99Ms.toFixed(1)}ms · schedule
               deviation max {detail.result.workerHealth.maxScheduleDeviationMs.toFixed(1)}ms
             </p>

@@ -73,12 +73,26 @@ function PayloadCard({ title, payload }: { title: string; payload: Span['request
   )
 }
 
-export function Inspector({ spanId }: { spanId: string | null }) {
-  const spans = useDashboardStore((state) => state.spans)
+export function Inspector({ spanId, loadRunId = null }: { spanId: string | null; loadRunId?: string | null }) {
+  const liveSpans = useDashboardStore((state) => state.spans)
   const { navigate } = useHashRoute()
   const [detail, setDetail] = useState<{ span: Span; childSpans: Child[] } | null>(null)
   const [methodFilter, setMethodFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [runSpans, setRunSpans] = useState<Span[] | null>(null)
+
+  useEffect(() => {
+    if (loadRunId === null) {
+      setRunSpans(null)
+      return
+    }
+    void api
+      .spansByLoadRun(loadRunId)
+      .then(setRunSpans)
+      .catch(() => setRunSpans([]))
+  }, [loadRunId])
+
+  const spans = loadRunId === null ? liveSpans : (runSpans ?? [])
 
   useEffect(() => {
     if (spanId === null) {
@@ -94,6 +108,9 @@ export function Inspector({ spanId }: { spanId: string | null }) {
       (statusFilter === '' || String(span.statusCode).startsWith(statusFilter))
   )
 
+  const inspectorPathFor = (nextSpanId: string): string =>
+    loadRunId === null ? `/inspector/${nextSpanId}` : `/inspector/run/${loadRunId}/${nextSpanId}`
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return
@@ -101,17 +118,29 @@ export function Inspector({ spanId }: { spanId: string | null }) {
       const currentIndex = filtered.findIndex((span) => span.id === spanId)
       const nextIndex = event.key === 'j' ? Math.min(currentIndex + 1, filtered.length - 1) : Math.max(currentIndex - 1, 0)
       const next = filtered[nextIndex]
-      if (next !== undefined) navigate(`/inspector/${next.id}`)
+      if (next !== undefined) navigate(inspectorPathFor(next.id))
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [filtered, spanId, navigate])
+  }, [filtered, spanId, navigate, loadRunId])
 
-  if (spans.length === 0) return <div className="empty">no requests captured yet</div>
+  if (loadRunId !== null && runSpans === null) return <div className="empty">loading spans for this run</div>
+  if (spans.length === 0) {
+    return (
+      <div className="empty">
+        {loadRunId === null ? 'no requests captured yet' : 'no spans found for this run'}
+      </div>
+    )
+  }
 
   return (
     <div className="grid-2">
       <section>
+        {loadRunId !== null && (
+          <p className="metric" data-testid="load-run-filter">
+            filtered to load run {loadRunId}
+          </p>
+        )}
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <select aria-label="method filter" value={methodFilter} onChange={(event) => setMethodFilter(event.target.value)}>
             <option value="">all methods</option>
@@ -140,7 +169,7 @@ export function Inspector({ spanId }: { spanId: string | null }) {
               <tr
                 key={span.id}
                 data-selected={span.id === spanId}
-                onClick={() => navigate(`/inspector/${span.id}`)}
+                onClick={() => navigate(inspectorPathFor(span.id))}
                 style={{ cursor: 'pointer' }}
               >
                 <td className="mono">{span.method}</td>

@@ -30,6 +30,7 @@ export interface SpanStore {
   replaceRoutes(appName: string, routes: RouteRegistryEntry[]): Promise<void>
   listRoutes(): Promise<Array<{ appName: string } & RouteRegistryEntry>>
   recentSpans(limit: number): Promise<RequestSpan[]>
+  spansByLoadRun(loadRunId: string, limit: number): Promise<RequestSpan[]>
   spanById(id: string): Promise<{ span: RequestSpan; childSpans: ChildSpan[] } | null>
   routeStats(): Promise<RouteStats[]>
   insertLoadRun(run: StoredLoadRun): Promise<void>

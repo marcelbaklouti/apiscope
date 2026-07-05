@@ -8,6 +8,8 @@ async function getJson<T>(path: string): Promise<T> {
 
 export const api = {
   spans: (limit = 200) => getJson<Span[]>(`/api/spans?limit=${limit}`),
+  spansByLoadRun: (loadRunId: string, limit = 200) =>
+    getJson<Span[]>(`/api/spans?loadRunId=${encodeURIComponent(loadRunId)}&limit=${limit}`),
   spanById: (id: string) => getJson<{ span: Span; childSpans: Child[] }>(`/api/spans/${encodeURIComponent(id)}`),
   routes: () => getJson<RouteEntry[]>('/api/routes'),
   routeStats: () => getJson<RouteStatsEntry[]>('/api/route-stats'),

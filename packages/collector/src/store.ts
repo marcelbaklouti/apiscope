@@ -256,6 +256,13 @@ export class SqliteSpanStore implements SpanStore {
     return rows.map(rowToSpan)
   }
 
+  async spansByLoadRun(loadRunId: string, limit: number): Promise<RequestSpan[]> {
+    const rows = this.db
+      .prepare(`SELECT * FROM spans WHERE load_run_id = ? ORDER BY rowid DESC LIMIT ?`)
+      .all(loadRunId, limit) as SpanRow[]
+    return rows.map(rowToSpan)
+  }
+
   async spanById(id: string): Promise<{ span: RequestSpan; childSpans: ChildSpan[] } | null> {
     const row = this.db.prepare(`SELECT * FROM spans WHERE id = ?`).get(id) as SpanRow | undefined
     if (row === undefined) return null

@@ -96,7 +96,8 @@ function DashboardShell() {
       <main>
         {view === 'overview' && <Overview />}
         {view === 'routes' && <Routes />}
-        {view === 'inspector' && <Inspector spanId={segments[1] ?? null} />}
+        {view === 'inspector' && segments[1] === 'run' && <Inspector spanId={segments[3] ?? null} loadRunId={segments[2] ?? null} />}
+        {view === 'inspector' && segments[1] !== 'run' && <Inspector spanId={segments[1] ?? null} />}
         {view === 'load' && <LoadView />}
         {view === 'runs' && <Runs runId={segments[1] ?? null} />}
         {view === 'config' && <ConfigView />}

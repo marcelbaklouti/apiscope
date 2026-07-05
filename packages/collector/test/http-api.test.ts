@@ -84,4 +84,34 @@ describe('HTTP ingest and read APIs', () => {
     const response = await fetch(`${baseUrl}/api/spans/missing`)
     expect(response.status).toBe(404)
   })
+
+  it('filters spans by load-run id via query parameter', async () => {
+    const baseUrl = await startCollector()
+    await fetch(`${baseUrl}/ingest`, {
+      method: 'POST',
+      body: encodeWireMessage({
+        type: 'handshake',
+        protocolVersion: PROTOCOL_VERSION,
+        app: { name: 'edge-app', framework: 'hono', runtime: 'edge' },
+        routes: []
+      })
+    })
+    const taggedSpan: RequestSpan = { ...sampleSpan, id: 'tagged', loadRunId: 'run-1' }
+    const untaggedSpan: RequestSpan = { ...sampleSpan, id: 'untagged' }
+    await fetch(`${baseUrl}/ingest`, {
+      method: 'POST',
+      headers: { 'x-apiscope-app': 'edge-app' },
+      body: encodeWireMessage({
+        type: 'span-batch',
+        protocolVersion: PROTOCOL_VERSION,
+        spans: [taggedSpan, untaggedSpan],
+        childSpans: [],
+        droppedCount: 0
+      })
+    })
+    const filtered = (await (await fetch(`${baseUrl}/api/spans?loadRunId=run-1`)).json()) as RequestSpan[]
+    expect(filtered.map((span) => span.id)).toEqual(['tagged'])
+    const unfiltered = (await (await fetch(`${baseUrl}/api/spans?limit=10`)).json()) as RequestSpan[]
+    expect(unfiltered.map((span) => span.id).sort()).toEqual(['tagged', 'untagged'])
+  })
 })

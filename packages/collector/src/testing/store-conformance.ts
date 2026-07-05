@@ -58,6 +58,18 @@ export function runStoreConformance(
       await store.close()
     })
 
+    it('filters spans by load-run id', async () => {
+      const store = await createStore()
+      await store.init()
+      await store.insertBatch('demo', {
+        spans: [span({ id: 'lr1', loadRunId: 'run-a' }), span({ id: 'lr2' })],
+        childSpans: []
+      })
+      const filtered = await store.spansByLoadRun('run-a', 10)
+      expect(filtered.map((entry) => entry.id)).toEqual(['lr1'])
+      await store.close()
+    })
+
     it('returns recent spans newest first', async () => {
       const store = await createStore()
       await store.init()
