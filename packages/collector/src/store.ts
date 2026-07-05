@@ -84,6 +84,14 @@ CREATE TABLE IF NOT EXISTS routes (
   source_file TEXT,
   PRIMARY KEY (app_name, method, pattern)
 );
+CREATE TABLE IF NOT EXISTS load_runs (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  started_at INTEGER NOT NULL,
+  scenario_json TEXT NOT NULL,
+  result_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_load_runs_started ON load_runs(started_at DESC);
 `
 
 function rowToSpan(row: SpanRow): RequestSpan {
@@ -117,6 +125,20 @@ function rowToChildSpan(row: ChildSpanRow): ChildSpan {
   }
   if (row.error_json !== null) childSpan.error = JSON.parse(row.error_json)
   return childSpan
+}
+
+export interface StoredLoadRun {
+  id: string
+  name: string
+  startedAt: number
+  scenarioJson: string
+  resultJson: string
+}
+
+export interface StoredLoadRunSummary {
+  id: string
+  name: string
+  startedAt: number
 }
 
 function isHealthy(db: Database.Database): boolean {
@@ -280,6 +302,31 @@ export class SpanStore {
       p95: percentileOf(group.route_pattern, group.method, group.count, 0.95),
       p99: percentileOf(group.route_pattern, group.method, group.count, 0.99)
     }))
+  }
+
+  insertLoadRun(run: StoredLoadRun): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO load_runs (id, name, started_at, scenario_json, result_json)
+         VALUES (@id, @name, @startedAt, @scenarioJson, @resultJson)`
+      )
+      .run(run)
+  }
+
+  listLoadRuns(): StoredLoadRunSummary[] {
+    return this.db
+      .prepare(`SELECT id, name, started_at AS startedAt FROM load_runs ORDER BY started_at DESC`)
+      .all() as StoredLoadRunSummary[]
+  }
+
+  loadRunById(id: string): StoredLoadRun | null {
+    const row = this.db
+      .prepare(
+        `SELECT id, name, started_at AS startedAt, scenario_json AS scenarioJson, result_json AS resultJson
+         FROM load_runs WHERE id = ?`
+      )
+      .get(id) as StoredLoadRun | undefined
+    return row ?? null
   }
 
   close(): void {

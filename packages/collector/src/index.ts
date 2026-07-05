@@ -7,7 +7,7 @@ import { createHttpServer, readBody, sendJson, type CollectorOptions, type Route
 
 export type { CollectorOptions }
 export { SpanStore } from './store'
-export type { RouteStats } from './store'
+export type { RouteStats, StoredLoadRun, StoredLoadRunSummary } from './store'
 export { LiveHub } from './live-hub'
 export type { LiveEvent } from './live-hub'
 export { IngestProcessor } from './ingest'
