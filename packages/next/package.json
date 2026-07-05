@@ -1,0 +1,39 @@
+{
+  "name": "@apiscope/next",
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@apiscope/adapter-node": "workspace:*",
+    "@apiscope/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "next": ">=15.0.0"
+  },
+  "devDependencies": {
+    "@apiscope/collector": "workspace:*",
+    "@types/node": "^26.1.0",
+    "next": "^16.2.10",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9"
+  }
+}
