@@ -1,4 +1,5 @@
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
+import { detectNPlusOne } from './analysis/nplusone'
 import { createDashboardAuthenticator, type DashboardAuthenticator } from './auth/dashboard-auth'
 import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/ingest-auth'
 import { IngestProcessor } from './ingest'
@@ -42,6 +43,23 @@ export interface Collector {
   store: SpanStore
   hub: LiveTransport
   otlpGrpcPort?: number
+}
+
+const N_PLUS_ONE_RECENT_SPAN_WINDOW = 200
+
+async function countNPlusOneRequestsByRoute(store: SpanStore): Promise<Map<string, number>> {
+  const recentSpans = await store.recentSpans(N_PLUS_ONE_RECENT_SPAN_WINDOW)
+  const counts = new Map<string, number>()
+  for (const span of recentSpans) {
+    if (span.routePattern === null) continue
+    const detail = await store.spanById(span.id)
+    if (detail === null) continue
+    const groups = detectNPlusOne(detail.childSpans)
+    if (groups.length === 0) continue
+    const key = `${span.method} ${span.routePattern}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return counts
 }
 
 function handleIngest(processor: IngestProcessor, ingestAuth: IngestAuthenticator) {
@@ -162,7 +180,15 @@ export function createCollector(options: CollectorOptions): Collector {
     const loadRunId = url.searchParams.get('loadRunId')
     sendJson(response, 200, loadRunId === null ? await store.recentSpans(limit) : await store.spansByLoadRun(loadRunId, limit))
   })
-  routes.set('GET /api/routes', async (request, response) => sendJson(response, 200, await store.listRoutes()))
+  routes.set('GET /api/routes', async (request, response) => {
+    const registryEntries = await store.listRoutes()
+    const nPlusOneRequestsByRoute = await countNPlusOneRequestsByRoute(store)
+    const withIndicator = registryEntries.map((entry) => ({
+      ...entry,
+      nPlusOneRequests: nPlusOneRequestsByRoute.get(`${entry.method} ${entry.pattern}`) ?? 0
+    }))
+    sendJson(response, 200, withIndicator)
+  })
   routes.set('GET /api/route-stats', async (request, response) => sendJson(response, 200, await store.routeStats()))
   routes.set('GET /api/meta', (request, response) => sendJson(response, 200, { meta: options.meta ?? null }))
   routes.set('GET /api/load-runs', async (request, response) => sendJson(response, 200, await store.listLoadRuns()))
@@ -181,7 +207,7 @@ export function createCollector(options: CollectorOptions): Collector {
     if (request.method !== 'GET' || match === null || match[1] === undefined) return false
     const detail = await store.spanById(decodeURIComponent(match[1]))
     if (detail === null) sendJson(response, 404, { error: 'not-found' })
-    else sendJson(response, 200, detail)
+    else sendJson(response, 200, { ...detail, nPlusOne: detectNPlusOne(detail.childSpans) })
     return true
   }
   const loadRunDetailHandler: DynamicHandler = async (request, response, url) => {

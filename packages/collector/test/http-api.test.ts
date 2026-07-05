@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { encodeWireMessage, PROTOCOL_VERSION } from '@apiscope/core'
-import type { RequestSpan } from '@apiscope/core'
+import type { ChildSpan, DbChildSpan, RequestSpan } from '@apiscope/core'
 import { createCollector, type Collector } from '../src/index'
 
 let collector: Collector
@@ -113,5 +113,48 @@ describe('HTTP ingest and read APIs', () => {
     expect(filtered.map((span) => span.id)).toEqual(['tagged'])
     const unfiltered = (await (await fetch(`${baseUrl}/api/spans?limit=10`)).json()) as RequestSpan[]
     expect(unfiltered.map((span) => span.id).sort()).toEqual(['tagged', 'untagged'])
+  })
+
+  it('surfaces n+1 groups on span detail and a route indicator on the routes list', async () => {
+    const baseUrl = await startCollector()
+    await fetch(`${baseUrl}/ingest`, {
+      method: 'POST',
+      body: encodeWireMessage({
+        type: 'handshake',
+        protocolVersion: PROTOCOL_VERSION,
+        app: { name: 'n1-app', framework: 'express', runtime: 'node' },
+        routes: [{ method: 'GET', pattern: '/api/posts' }]
+      })
+    })
+    const nPlusOneSpan: RequestSpan = { ...sampleSpan, id: 'n1', method: 'GET', routePattern: '/api/posts', actualPath: '/api/posts' }
+    const dbChildren: DbChildSpan[] = Array.from({ length: 6 }, (_, index) => ({
+      id: `dbchild-${index}`,
+      parentSpanId: 'n1',
+      traceId: 't1',
+      kind: 'db',
+      system: 'postgresql',
+      statement: `SELECT * FROM comments WHERE post_id = ${index}`,
+      operation: 'SELECT',
+      target: 'appdb',
+      rowCount: 1,
+      timing: { start: index, ttfb: null, duration: 1 }
+    }))
+    await fetch(`${baseUrl}/ingest`, {
+      method: 'POST',
+      headers: { 'x-apiscope-app': 'n1-app' },
+      body: encodeWireMessage({
+        type: 'span-batch',
+        protocolVersion: PROTOCOL_VERSION,
+        spans: [nPlusOneSpan],
+        childSpans: dbChildren as ChildSpan[],
+        droppedCount: 0
+      })
+    })
+    const detail = (await (await fetch(`${baseUrl}/api/spans/n1`)).json()) as { nPlusOne: Array<{ count: number }> }
+    expect(detail.nPlusOne).toHaveLength(1)
+    expect(detail.nPlusOne[0]?.count).toBe(6)
+    const routes = (await (await fetch(`${baseUrl}/api/routes`)).json()) as Array<{ pattern: string; nPlusOneRequests: number }>
+    const postsRoute = routes.find((route) => route.pattern === '/api/posts')
+    expect(postsRoute?.nPlusOneRequests).toBe(1)
   })
 })
