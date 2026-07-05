@@ -6,6 +6,7 @@ import { InProcessLiveTransport } from './live-hub'
 import type { LiveTransport } from './live/live-transport'
 import { startLoadRun, type LoadRunRequest } from './load-runs'
 import { createMetrics } from './metrics'
+import { createOtlpExporter } from './otlp/exporter'
 import { createKeepAllSampler } from './sampling/sampler'
 import { createStaticHandler } from './static'
 import { SqliteSpanStore } from './store'
@@ -130,7 +131,8 @@ export function createCollector(options: CollectorOptions): Collector {
   const hub = options.hub ?? new InProcessLiveTransport()
   const sampler = options.sampler ?? createKeepAllSampler()
   const metrics = createMetrics()
-  const processor = new IngestProcessor(store, hub, sampler, metrics)
+  const exporter = options.otlpExport === undefined ? undefined : createOtlpExporter(options.otlpExport)
+  const processor = new IngestProcessor(store, hub, sampler, metrics, exporter)
   const ingestAuth = options.ingestAuth ?? createNoneIngestAuthenticator()
   const dashboardAuth = options.dashboardAuth ?? createInlineNoneDashboardAuthenticator()
   if (dashboardAuth.mode === 'none' && !isLoopbackHost(host) && options.allowInsecure !== true) {

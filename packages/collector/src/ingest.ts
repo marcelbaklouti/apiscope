@@ -1,6 +1,7 @@
-import { decodeWireMessage, type DecodeError, type RequestSpan } from '@apiscope/core'
+import { decodeWireMessage, type ChildSpan, type DecodeError, type RequestSpan } from '@apiscope/core'
 import type { LiveTransport } from './live/live-transport'
 import type { CollectorMetrics } from './metrics'
+import type { OtlpExporter } from './otlp/exporter'
 import type { Sampler } from './sampling/sampler'
 import type { SpanStore } from './store-interface'
 
@@ -16,7 +17,8 @@ export class IngestProcessor {
     private readonly store: SpanStore,
     private readonly hub: LiveTransport,
     private readonly sampler: Sampler,
-    private readonly metrics: CollectorMetrics
+    private readonly metrics: CollectorMetrics,
+    private readonly exporter?: OtlpExporter
   ) {}
 
   async process(raw: string, session: IngestSession): Promise<IngestResult> {
@@ -56,10 +58,13 @@ export class IngestProcessor {
         droppedBySampler += 1
       }
     }
-    const keptChildSpans = message.childSpans.filter((child) => keptIds.has(child.parentSpanId))
+    const keptChildSpans: ChildSpan[] = message.childSpans.filter((child) => keptIds.has(child.parentSpanId))
     const insertStart = process.hrtime.bigint()
     await this.store.insertBatch(appName, { spans: keptSpans, childSpans: keptChildSpans })
     const insertSeconds = Number(process.hrtime.bigint() - insertStart) / 1e9
+    if (this.exporter !== undefined && (keptSpans.length > 0 || keptChildSpans.length > 0)) {
+      void this.exporter.export(keptSpans, keptChildSpans)
+    }
     this.metrics.observeInsertSeconds(insertSeconds)
     this.metrics.recordIngestedSpans(appName, keptSpans.length)
     const totalDropped = message.droppedCount + droppedBySampler

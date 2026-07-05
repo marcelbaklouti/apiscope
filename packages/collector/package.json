@@ -33,6 +33,8 @@
   "dependencies": {
     "@apiscope/core": "workspace:*",
     "@apiscope/load": "workspace:*",
+    "@grpc/grpc-js": "^1.14.4",
+    "@grpc/proto-loader": "^0.8.1",
     "@valkey/valkey-glide": "2.4.2",
     "argon2": "^0.44.0",
     "better-sqlite3": "^12.11.1",
@@ -40,6 +42,7 @@
     "jose": "^6.2.3",
     "openid-client": "^6.8.4",
     "prom-client": "^15.1.3",
+    "protobufjs": "^8.6.6",
     "ws": "^8.21.0"
   },
   "optionalDependencies": {
@@ -47,6 +50,7 @@
   },
   "devDependencies": {
     "@apiscope/adapter-node": "workspace:*",
+    "@opentelemetry/semantic-conventions": "^1.41.1",
     "@testcontainers/valkey": "^12.0.4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^26.1.0",

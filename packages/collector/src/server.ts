@@ -3,6 +3,7 @@ import { createServer as createHttpsServer } from 'node:https'
 import type { DashboardAuthenticator } from './auth/dashboard-auth'
 import type { IngestAuthenticator } from './auth/ingest-auth'
 import type { LiveTransport } from './live/live-transport'
+import type { OtlpExportConfig } from './otlp/exporter'
 import type { Sampler } from './sampling/sampler'
 import type { SpanStore } from './store-interface'
 
@@ -11,6 +12,13 @@ export interface TlsOptions {
   cert: string
   ca?: string
   requestCert?: boolean
+}
+
+export interface OtlpIngestOptions {
+  http?: boolean
+  grpc?: boolean
+  grpcPort?: number
+  appName?: string
 }
 
 export interface CollectorOptions {
@@ -27,6 +35,8 @@ export interface CollectorOptions {
   hub?: LiveTransport
   tls?: TlsOptions
   allowInsecure?: boolean
+  otlpExport?: OtlpExportConfig
+  otlpIngest?: OtlpIngestOptions
 }
 
 export type RouteHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => void | Promise<void>
