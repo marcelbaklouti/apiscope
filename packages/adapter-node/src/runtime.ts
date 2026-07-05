@@ -10,6 +10,7 @@ import {
   type RequestSpan,
   type RouteRegistryEntry
 } from '@apiscope/core'
+import { instrumentDatabases } from './db/index'
 import { CollectorTransport } from './transport'
 
 function readHeader(headers: Record<string, string | string[] | undefined>, name: string): string | undefined {
@@ -53,6 +54,7 @@ export class AdapterRuntime {
 
   start(): void {
     this.transport.start()
+    instrumentDatabases(this)
   }
 
   setRoutes(routes: RouteRegistryEntry[]): void {

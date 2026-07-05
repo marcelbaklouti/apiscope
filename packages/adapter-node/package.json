@@ -29,9 +29,36 @@
     "@apiscope/core": "workspace:*",
     "ws": "^8.21.0"
   },
+  "peerDependencies": {
+    "@prisma/instrumentation": "^7.8.0",
+    "better-sqlite3": "^12.11.1",
+    "mongodb": "^7.4.0",
+    "mysql2": "^3.22.5",
+    "pg": "^8.22.0"
+  },
+  "peerDependenciesMeta": {
+    "@prisma/instrumentation": { "optional": true },
+    "better-sqlite3": { "optional": true },
+    "mongodb": { "optional": true },
+    "mysql2": { "optional": true },
+    "pg": { "optional": true }
+  },
   "devDependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-trace-base": "^2.2.0",
+    "@prisma/instrumentation": "^7.8.0",
+    "@testcontainers/mongodb": "^12.0.4",
+    "@testcontainers/mysql": "^12.0.4",
+    "@testcontainers/postgresql": "^12.0.4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^26.1.0",
+    "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
+    "@apiscope/collector": "workspace:*",
+    "better-sqlite3": "^12.11.1",
+    "mongodb": "^7.4.0",
+    "mysql2": "^3.22.5",
+    "pg": "^8.22.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.9"
