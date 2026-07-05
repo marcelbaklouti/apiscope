@@ -7,6 +7,7 @@ import type { LiveTransport } from './live/live-transport'
 import { startLoadRun, type LoadRunRequest } from './load-runs'
 import { createMetrics } from './metrics'
 import { createOtlpExporter } from './otlp/exporter'
+import { createOtlpGrpcServer } from './otlp/receiver-grpc'
 import { createOtlpHttpHandler } from './otlp/receiver-http'
 import { createKeepAllSampler } from './sampling/sampler'
 import { createStaticHandler } from './static'
@@ -40,6 +41,7 @@ export interface Collector {
   close(): Promise<void>
   store: SpanStore
   hub: LiveTransport
+  otlpGrpcPort?: number
 }
 
 function handleIngest(processor: IngestProcessor, ingestAuth: IngestAuthenticator) {
@@ -225,31 +227,47 @@ export function createCollector(options: CollectorOptions): Collector {
   const guardedDynamicHandlers = dynamicHandlers.map((handler) => wrapDynamicWithDashboardGuard(handler, dashboardAuth))
   const server: Server = createHttpServer(guardedRoutes, guardedDynamicHandlers, options.tls)
   attachWebSockets(server, processor, hub, ingestAuth, metrics)
-  return {
+  const otlpGrpcServer =
+    options.otlpIngest?.grpc === true
+      ? createOtlpGrpcServer({
+          host,
+          port: options.otlpIngest.grpcPort ?? 4317,
+          appName: options.otlpIngest.appName ?? 'otlp',
+          ingest: (appName, spans, childSpans) => processor.ingestSpans(appName, spans, childSpans)
+        })
+      : null
+  const collector: Collector = {
     store,
     hub,
-    listen() {
-      return new Promise((resolve, reject) => {
+    async listen() {
+      const address = await new Promise<{ host: string; port: number }>((resolve, reject) => {
         server.once('error', reject)
         server.listen(port, host, () => {
-          const address = server.address()
-          if (address === null || typeof address === 'string') {
+          const boundAddress = server.address()
+          if (boundAddress === null || typeof boundAddress === 'string') {
             reject(new Error('collector failed to bind'))
             return
           }
-          resolve({ host, port: address.port })
+          resolve({ host, port: boundAddress.port })
         })
       })
+      if (otlpGrpcServer !== null) {
+        collector.otlpGrpcPort = await otlpGrpcServer.start()
+      }
+      return address
     },
     close() {
       return new Promise((resolve, reject) => {
         server.close((error) => {
-          void store.close().then(() => {
-            if (error) reject(error)
-            else resolve()
-          })
+          void Promise.resolve(otlpGrpcServer === null ? undefined : otlpGrpcServer.stop())
+            .then(() => store.close())
+            .then(() => {
+              if (error) reject(error)
+              else resolve()
+            })
         })
       })
     }
   }
+  return collector
 }
