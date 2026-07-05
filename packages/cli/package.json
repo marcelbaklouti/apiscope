@@ -25,6 +25,7 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsup",
+    "build:binary": "pkg --config pkg.config.json dist/cli.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
+    "@yao-pkg/pkg": "^6.21.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.9"

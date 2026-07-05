@@ -1,0 +1,12 @@
+{
+  "name": "apiscope",
+  "bin": "dist/cli.js",
+  "pkg": {
+    "assets": [
+      "../collector/node_modules/better-sqlite3/build/Release/*.node",
+      "../dashboard/dist/**/*"
+    ],
+    "targets": ["node24-linux-x64", "node24-linux-arm64", "node24-macos-x64", "node24-macos-arm64"],
+    "outputPath": "binaries"
+  }
+}
