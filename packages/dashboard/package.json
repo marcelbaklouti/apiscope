@@ -3,6 +3,12 @@
   "version": "0.0.0",
   "license": "MIT",
   "private": false,
+  "description": "apiscope dashboard UI",
+  "repository": { "type": "git", "url": "git+https://github.com/marcelbaklouti/apiscope.git", "directory": "packages/dashboard" },
+  "homepage": "https://github.com/marcelbaklouti/apiscope#readme",
+  "bugs": "https://github.com/marcelbaklouti/apiscope/issues",
+  "keywords": ["apiscope", "api", "monitoring", "load-testing", "devtools"],
+  "publishConfig": { "access": "public" },
   "type": "module",
   "files": ["dist"],
   "scripts": {
