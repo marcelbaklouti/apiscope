@@ -9,6 +9,8 @@ export interface CollectorOptions {
 
 export type RouteHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => void | Promise<void>
 
+export type DynamicHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => boolean
+
 export function sendJson(response: ServerResponse, statusCode: number, body: unknown): void {
   const payload = JSON.stringify(body)
   response.writeHead(statusCode, { 'content-type': 'application/json' })
@@ -21,18 +23,19 @@ export async function readBody(request: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-export function createHttpServer(routes: Map<string, RouteHandler>): Server {
+export function createHttpServer(routes: Map<string, RouteHandler>, dynamicHandler?: DynamicHandler): Server {
   return createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost')
     const handler = routes.get(`${request.method} ${url.pathname}`)
-    if (!handler) {
-      sendJson(response, 404, { error: 'not-found' })
+    if (handler) {
+      try {
+        await handler(request, response, url)
+      } catch {
+        if (!response.headersSent) sendJson(response, 500, { error: 'internal' })
+      }
       return
     }
-    try {
-      await handler(request, response, url)
-    } catch {
-      if (!response.headersSent) sendJson(response, 500, { error: 'internal' })
-    }
+    if (dynamicHandler?.(request, response, url)) return
+    sendJson(response, 404, { error: 'not-found' })
   })
 }
