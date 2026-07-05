@@ -104,6 +104,26 @@ const productionSchema = z
   })
   .optional()
 
+const otlpSchema = z
+  .object({
+    export: z
+      .object({
+        endpoint: z.string(),
+        protocol: z.enum(['http/json', 'http/protobuf', 'grpc']),
+        headers: z.record(z.string(), z.string()).optional()
+      })
+      .optional(),
+    ingest: z
+      .object({
+        http: z.boolean().optional(),
+        grpc: z.boolean().optional(),
+        grpcPort: z.number().int().positive().optional(),
+        appName: z.string().optional()
+      })
+      .optional()
+  })
+  .optional()
+
 const configSchema = z.object({
   collector: z
     .object({
@@ -134,7 +154,8 @@ const configSchema = z.object({
       scenarios: z.array(z.object({ scenario: scenarioSchema, assertions: assertionsSchema.optional() })).min(1)
     })
     .optional(),
-  production: productionSchema
+  production: productionSchema,
+  otlp: otlpSchema
 })
 
 export type IngestAuthConfig = { mode: 'none' } | { mode: 'token'; tokens: Array<{ appName: string; token: string }> }
@@ -158,6 +179,26 @@ export interface ProductionConfig {
   sampling?: SamplingConfig
 }
 
+export type OtlpProtocolConfig = 'http/json' | 'http/protobuf' | 'grpc'
+
+export interface OtlpExportConfigInput {
+  endpoint: string
+  protocol: OtlpProtocolConfig
+  headers?: Record<string, string>
+}
+
+export interface OtlpIngestConfigInput {
+  http?: boolean
+  grpc?: boolean
+  grpcPort?: number
+  appName?: string
+}
+
+export interface OtlpConfig {
+  export?: OtlpExportConfigInput
+  ingest?: OtlpIngestConfigInput
+}
+
 export interface ApiscopeConfig {
   collector?: { host?: string; port?: number; dbPath?: string; retentionRows?: number; storage?: StorageConfig }
   ci?: {
@@ -168,6 +209,7 @@ export interface ApiscopeConfig {
     scenarios: Array<{ scenario: LoadScenario; assertions?: LoadAssertions }>
   }
   production?: ProductionConfig
+  otlp?: OtlpConfig
 }
 
 export class ConfigError extends Error {}

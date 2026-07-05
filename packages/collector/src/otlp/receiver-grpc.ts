@@ -3,6 +3,7 @@ import { loadSync } from '@grpc/proto-loader'
 import { join } from 'node:path'
 import type { ChildSpan, RequestSpan } from '@apiscope/core'
 import { exportRequestToSpans, type OtlpExportTraceServiceRequest, type OtlpKeyValue, type OtlpResourceSpans } from './mapping'
+import { protoRootDirectory } from './proto'
 
 export interface OtlpGrpcServerDeps {
   port: number
@@ -15,8 +16,6 @@ export interface OtlpGrpcServer {
   start(): Promise<number>
   stop(): Promise<void>
 }
-
-const protoRootDirectory = join(import.meta.dirname, '..', '..', 'proto')
 
 interface DecodedKeyValue {
   key: string

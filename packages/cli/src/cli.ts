@@ -11,6 +11,7 @@ import {
   createTokenIngestAuthenticator,
   createValkeyLiveTransport,
   resolveStore,
+  type CollectorOptions,
   type DashboardAuthenticator,
   type LiveTransport,
   type Sampler,
@@ -18,7 +19,7 @@ import {
   type StorageConfig
 } from '@apiscope/collector'
 import { runCi } from './ci'
-import { ConfigError, loadConfig, type ApiscopeConfig, type ProductionConfig } from './config'
+import { ConfigError, loadConfig, type ApiscopeConfig, type OtlpConfig, type ProductionConfig } from './config'
 import { resolveSecret } from './secrets'
 
 export type CliInvocation =
@@ -131,6 +132,30 @@ function resolveSampler(production: ProductionConfig | undefined): Sampler | und
   })
 }
 
+function resolveOtlpOptions(otlp: OtlpConfig | undefined): Pick<CollectorOptions, 'otlpExport' | 'otlpIngest'> {
+  const exportConfig = otlp?.export
+  const ingestConfig = otlp?.ingest
+  return {
+    ...(exportConfig === undefined
+      ? {}
+      : {
+          otlpExport: {
+            endpoint: exportConfig.endpoint,
+            protocol: exportConfig.protocol,
+            serviceName: 'apiscope',
+            ...(exportConfig.headers === undefined
+              ? {}
+              : {
+                  headers: Object.fromEntries(
+                    Object.entries(exportConfig.headers).map(([key, value]) => [key, resolveSecret(value)])
+                  )
+                })
+          }
+        }),
+    ...(ingestConfig === undefined ? {} : { otlpIngest: ingestConfig })
+  }
+}
+
 interface StartCollectorServerOptions {
   defaultHost: string
   announce: 'dev' | 'prod'
@@ -169,6 +194,7 @@ async function startCollectorServer(configPath: string | null, options: StartCol
           ...(tlsConfig.ca === undefined ? {} : { ca: resolveSecret(tlsConfig.ca) }),
           ...(tlsConfig.requestCert === undefined ? {} : { requestCert: tlsConfig.requestCert })
         }
+  const otlpOptions = resolveOtlpOptions(config.otlp)
   const collector = createCollector({
     dbPath,
     host: config.collector?.host ?? options.defaultHost,
@@ -182,6 +208,7 @@ async function startCollectorServer(configPath: string | null, options: StartCol
     sampler,
     ...(tls === undefined ? {} : { tls }),
     ...(production?.allowInsecure === undefined ? {} : { allowInsecure: production.allowInsecure }),
+    ...otlpOptions,
     meta: config
   })
   const address = await collector.listen()

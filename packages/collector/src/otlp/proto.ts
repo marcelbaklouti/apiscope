@@ -1,8 +1,22 @@
-import { isAbsolute, join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { dirname, isAbsolute, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import protobuf, { type Root, type Type } from 'protobufjs'
 import type { OtlpExportTraceServiceRequest, OtlpKeyValue, OtlpResourceSpans, OtlpScopeSpans, OtlpSpan } from './mapping'
 
-const protoRootDirectory = join(import.meta.dirname, '..', '..', 'proto')
+function findProtoRootDirectory(startDirectory: string): string {
+  let candidate = startDirectory
+  for (let depth = 0; depth < 6; depth += 1) {
+    const protoCandidate = join(candidate, 'proto')
+    if (existsSync(join(protoCandidate, 'opentelemetry'))) return protoCandidate
+    const parent = dirname(candidate)
+    if (parent === candidate) break
+    candidate = parent
+  }
+  throw new Error('unable to locate the vendored otlp proto directory')
+}
+
+export const protoRootDirectory = findProtoRootDirectory(dirname(fileURLToPath(import.meta.url)))
 
 let cachedRoot: Root | undefined
 let cachedType: Type | undefined

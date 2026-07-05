@@ -3,7 +3,7 @@ import { loadSync } from '@grpc/proto-loader'
 import { join } from 'node:path'
 import type { ChildSpan, RequestSpan } from '@apiscope/core'
 import { spansToExportRequest } from './mapping'
-import { encodeExportRequest } from './proto'
+import { encodeExportRequest, protoRootDirectory } from './proto'
 
 export type OtlpProtocol = 'http/json' | 'http/protobuf' | 'grpc'
 
@@ -23,8 +23,6 @@ interface TraceServiceClient {
   Export: (request: unknown, callback: (error: unknown) => void) => void
   close?: () => void
 }
-
-const protoRootDirectory = join(import.meta.dirname, '..', '..', 'proto')
 
 function logExportFailureOnce(config: OtlpExportConfig): (error: unknown) => void {
   let logged = false

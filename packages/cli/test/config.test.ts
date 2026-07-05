@@ -73,4 +73,33 @@ describe('loadConfig', () => {
     const configPath = writeConfig(`export const config = {}`)
     await expect(loadConfig(configPath)).rejects.toThrow(/default export/)
   })
+
+  it('loads a config with otlp export (grpc) and ingest (http+grpc) blocks', async () => {
+    const configPath = writeConfig(`
+      const config = {
+        otlp: {
+          export: { endpoint: 'http://127.0.0.1:4317', protocol: 'grpc', headers: { authorization: 'Bearer abc' } },
+          ingest: { http: true, grpc: true, grpcPort: 4317, appName: 'imported' }
+        }
+      }
+      export default config
+    `)
+    const config = await loadConfig(configPath)
+    expect(config.otlp?.export?.protocol).toBe('grpc')
+    expect(config.otlp?.export?.endpoint).toBe('http://127.0.0.1:4317')
+    expect(config.otlp?.ingest?.http).toBe(true)
+    expect(config.otlp?.ingest?.grpc).toBe(true)
+    expect(config.otlp?.ingest?.grpcPort).toBe(4317)
+  })
+
+  it('reports the exact path for an invalid otlp export protocol', async () => {
+    const configPath = writeConfig(`
+      export default {
+        otlp: {
+          export: { endpoint: 'http://127.0.0.1:4318', protocol: 'carrier-pigeon' }
+        }
+      }
+    `)
+    await expect(loadConfig(configPath)).rejects.toThrow(/otlp\.export\.protocol/)
+  })
 })
