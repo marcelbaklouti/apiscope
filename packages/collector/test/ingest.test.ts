@@ -3,7 +3,7 @@ import { encodeWireMessage, PROTOCOL_VERSION } from '@apiscope/core'
 import type { RequestSpan } from '@apiscope/core'
 import { IngestProcessor } from '../src/ingest'
 import { LiveHub } from '../src/live-hub'
-import { SpanStore } from '../src/store'
+import { SqliteSpanStore } from '../src/store'
 
 const sampleSpan: RequestSpan = {
   id: 's1',
@@ -18,7 +18,7 @@ const sampleSpan: RequestSpan = {
 }
 
 function setup() {
-  const store = new SpanStore(':memory:')
+  const store = new SqliteSpanStore(':memory:')
   const hub = new LiveHub()
   const events: unknown[] = []
   hub.subscribe((event) => events.push(event))
@@ -26,10 +26,10 @@ function setup() {
 }
 
 describe('IngestProcessor', () => {
-  it('registers app and routes on handshake and publishes events', () => {
+  it('registers app and routes on handshake and publishes events', async () => {
     const { processor, store, events } = setup()
     const session = { appName: null as string | null }
-    const result = processor.process(
+    const result = await processor.process(
       encodeWireMessage({
         type: 'handshake',
         protocolVersion: PROTOCOL_VERSION,
@@ -40,17 +40,17 @@ describe('IngestProcessor', () => {
     )
     expect(result).toEqual({ ok: true, appName: 'demo' })
     expect(session.appName).toBe('demo')
-    expect(store.listRoutes()).toHaveLength(1)
+    expect(await store.listRoutes()).toHaveLength(1)
     expect(events).toEqual([
       { type: 'app-connected', app: { name: 'demo', framework: 'hono', runtime: 'edge' } },
       { type: 'registry', appName: 'demo', routes: [{ method: 'GET', pattern: '/health' }] }
     ])
   })
 
-  it('persists span batches and publishes spans plus dropped events', () => {
+  it('persists span batches and publishes spans plus dropped events', async () => {
     const { processor, store, events } = setup()
     const session = { appName: 'demo' as string | null }
-    const result = processor.process(
+    const result = await processor.process(
       encodeWireMessage({
         type: 'span-batch',
         protocolVersion: PROTOCOL_VERSION,
@@ -61,27 +61,27 @@ describe('IngestProcessor', () => {
       session
     )
     expect(result).toEqual({ ok: true, appName: 'demo' })
-    expect(store.spanById('s1')).not.toBeNull()
+    expect(await store.spanById('s1')).not.toBeNull()
     expect(events).toEqual([
       { type: 'spans', appName: 'demo', spans: [sampleSpan], childSpans: [] },
       { type: 'dropped', appName: 'demo', droppedCount: 3 }
     ])
   })
 
-  it('rejects span batches without a session app', () => {
+  it('rejects span batches without a session app', async () => {
     const { processor } = setup()
-    const result = processor.process(
+    const result = await processor.process(
       encodeWireMessage({ type: 'span-batch', protocolVersion: PROTOCOL_VERSION, spans: [], childSpans: [], droppedCount: 0 }),
       { appName: null }
     )
     expect(result).toEqual({ ok: false, error: { kind: 'missing-app' } })
   })
 
-  it('propagates decode errors without touching the store', () => {
+  it('propagates decode errors without touching the store', async () => {
     const { processor, store } = setup()
-    const result = processor.process('{broken', { appName: 'demo' })
+    const result = await processor.process('{broken', { appName: 'demo' })
     expect(result).toEqual({ ok: false, error: { kind: 'invalid-json' } })
-    expect(store.recentSpans(10)).toEqual([])
+    expect(await store.recentSpans(10)).toEqual([])
   })
 
   it('unsubscribing a live listener stops delivery', () => {

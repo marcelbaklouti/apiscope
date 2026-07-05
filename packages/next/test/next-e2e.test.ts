@@ -64,10 +64,8 @@ describe('next dev end to end', () => {
     const response = await fetch(`http://127.0.0.1:${nextPort}/api/hello/marcel`)
     expect(response.status).toBe(200)
     await vi.waitFor(
-      () => {
-        const span = collector.store
-          .recentSpans(50)
-          .find((entry) => entry.actualPath === '/api/hello/marcel')
+      async () => {
+        const span = (await collector.store.recentSpans(50)).find((entry) => entry.actualPath === '/api/hello/marcel')
         expect(span).toBeDefined()
         expect(span?.routePattern).toBe('/api/hello/:name')
         expect(span?.framework).toBe('next')
@@ -79,8 +77,8 @@ describe('next dev end to end', () => {
 
   it('registers the scanned route in the collector', async () => {
     await vi.waitFor(
-      () =>
-        expect(collector.store.listRoutes()).toContainEqual({
+      async () =>
+        expect(await collector.store.listRoutes()).toContainEqual({
           appName: 'next-fixture',
           method: 'GET',
           pattern: '/api/hello/:name',

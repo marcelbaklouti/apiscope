@@ -43,13 +43,13 @@ describe('apiscopeHono batch mode', () => {
     expect(response.status).toBe(200)
     if (shutdown !== null) await shutdown()
     shutdown = null
-    await vi.waitFor(() => expect(collector.store.recentSpans(10)).toHaveLength(1), { timeout: 2000 })
-    const span = collector.store.recentSpans(10)[0]!
+    await vi.waitFor(async () => expect(await collector.store.recentSpans(10)).toHaveLength(1), { timeout: 2000 })
+    const span = (await collector.store.recentSpans(10))[0]!
     expect(span.routePattern).toBe('/todos/:todoId')
     expect(span.actualPath).toBe('/todos/9')
     expect(span.framework).toBe('hono')
     expect(span.request?.headers['authorization']).toBe('[redacted]')
-    const routes = collector.store.listRoutes()
+    const routes = await collector.store.listRoutes()
     expect(routes).toContainEqual({ appName: 'hono-demo', method: 'GET', pattern: '/todos/:todoId' })
     expect(routes).toContainEqual({ appName: 'hono-demo', method: 'POST', pattern: '/todos' })
     expect(routes.every((route) => route.method !== 'ALL')).toBe(true)
@@ -62,8 +62,8 @@ describe('apiscopeHono batch mode', () => {
     if (shutdown !== null) await shutdown()
     shutdown = null
     await vi.waitFor(
-      () => {
-        const span = collector.store.recentSpans(10).find((entry) => entry.statusCode === 500)
+      async () => {
+        const span = (await collector.store.recentSpans(10)).find((entry) => entry.statusCode === 500)
         expect(span?.error?.message).toBe('hono handler failed')
       },
       { timeout: 2000 }
@@ -83,7 +83,7 @@ describe('apiscopeHono immediate mode', () => {
     expect(response.status).toBe(200)
     expect(backgroundWork.length).toBeGreaterThan(0)
     await Promise.all(backgroundWork)
-    expect(collector.store.recentSpans(10)).toHaveLength(1)
+    expect(await collector.store.recentSpans(10)).toHaveLength(1)
   })
 })
 

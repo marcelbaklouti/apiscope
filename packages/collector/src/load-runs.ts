@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { assertAllowedTarget, runLoadTest, type LoadAssertions, type LoadScenario } from '@apiscope/load'
 import { LiveHub } from './live-hub'
-import { SpanStore } from './store'
+import type { SpanStore } from './store-interface'
 
 export interface LoadRunRequest {
   scenario: LoadScenario
@@ -16,8 +16,8 @@ export function startLoadRun(request: LoadRunRequest, store: SpanStore, hub: Liv
     onProgress: (snapshot) =>
       hub.publish({ type: 'load-progress', runId, name: request.scenario.name, snapshot })
   })
-    .then((result) => {
-      store.insertLoadRun({
+    .then(async (result) => {
+      await store.insertLoadRun({
         id: runId,
         name: request.scenario.name,
         startedAt,

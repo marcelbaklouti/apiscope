@@ -52,13 +52,13 @@ describe('apiscopeExpress', () => {
     const response = await fetch(`${baseUrl}/users/42`, { headers: { authorization: 'Bearer secret' } })
     expect(response.status).toBe(200)
     await vi.waitFor(
-      () => {
-        const spans = collector.store.recentSpans(10)
+      async () => {
+        const spans = await collector.store.recentSpans(10)
         expect(spans).toHaveLength(1)
       },
       { timeout: 2000 }
     )
-    const span = collector.store.recentSpans(10)[0]!
+    const span = (await collector.store.recentSpans(10))[0]!
     expect(span.routePattern).toBe('/users/:id')
     expect(span.actualPath).toBe('/users/42')
     expect(span.statusCode).toBe(200)
@@ -74,7 +74,7 @@ describe('apiscopeExpress', () => {
     const response = await fetch(`${baseUrl}/fail`)
     expect(response.status).toBe(500)
     await vi.waitFor(
-      () => expect(collector.store.recentSpans(10).some((span) => span.statusCode === 500)).toBe(true),
+      async () => expect((await collector.store.recentSpans(10)).some((span) => span.statusCode === 500)).toBe(true),
       { timeout: 2000 }
     )
   })
@@ -83,7 +83,7 @@ describe('apiscopeExpress', () => {
     const { baseUrl } = await startStack()
     await fetch(`${baseUrl}/users/1`)
     await vi.waitFor(
-      () => expect(collector.store.listRoutes().length).toBeGreaterThanOrEqual(2),
+      async () => expect((await collector.store.listRoutes()).length).toBeGreaterThanOrEqual(2),
       { timeout: 2000 }
     )
   })

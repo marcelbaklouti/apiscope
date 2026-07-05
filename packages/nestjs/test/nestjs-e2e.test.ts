@@ -60,8 +60,8 @@ describe('ApiscopeModule', () => {
     const baseUrl = await startStack()
     const response = await fetch(`${baseUrl}/cats/42`)
     expect(response.status).toBe(200)
-    await vi.waitFor(() => expect(collector.store.recentSpans(10)).toHaveLength(1), { timeout: 2000 })
-    const span = collector.store.recentSpans(10)[0]!
+    await vi.waitFor(async () => expect(await collector.store.recentSpans(10)).toHaveLength(1), { timeout: 2000 })
+    const span = (await collector.store.recentSpans(10))[0]!
     expect(span.routePattern).toBe('/cats/:id')
     expect(span.actualPath).toBe('/cats/42')
     expect(span.framework).toBe('nestjs')
@@ -74,8 +74,8 @@ describe('ApiscopeModule', () => {
     const response = await fetch(`${baseUrl}/cats/boom`)
     expect(response.status).toBe(500)
     await vi.waitFor(
-      () => {
-        const span = collector.store.recentSpans(10).find((entry) => entry.statusCode === 500)
+      async () => {
+        const span = (await collector.store.recentSpans(10)).find((entry) => entry.statusCode === 500)
         expect(span?.error?.message).toBe('meow overflow')
         expect(span?.routePattern).toBe('/cats/boom')
       },
@@ -86,8 +86,8 @@ describe('ApiscopeModule', () => {
   it('pushes the registry on bootstrap', async () => {
     await startStack()
     await vi.waitFor(
-      () => {
-        const routes = collector.store.listRoutes()
+      async () => {
+        const routes = await collector.store.listRoutes()
         expect(routes).toContainEqual({ appName: 'nest-demo', method: 'GET', pattern: '/cats/:id' })
         expect(routes).toContainEqual({ appName: 'nest-demo', method: 'GET', pattern: '/cats/boom' })
         expect(routes).toContainEqual({ appName: 'nest-demo', method: 'POST', pattern: '/cats' })

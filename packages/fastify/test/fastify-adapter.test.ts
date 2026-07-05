@@ -38,8 +38,8 @@ describe('apiscopeFastify', () => {
     const baseUrl = await startStack()
     const response = await fetch(`${baseUrl}/items/7`)
     expect(response.status).toBe(200)
-    await vi.waitFor(() => expect(collector.store.recentSpans(10)).toHaveLength(1), { timeout: 2000 })
-    const span = collector.store.recentSpans(10)[0]!
+    await vi.waitFor(async () => expect(await collector.store.recentSpans(10)).toHaveLength(1), { timeout: 2000 })
+    const span = (await collector.store.recentSpans(10))[0]!
     expect(span.routePattern).toBe('/items/:itemId')
     expect(span.actualPath).toBe('/items/7')
     expect(span.framework).toBe('fastify')
@@ -51,8 +51,8 @@ describe('apiscopeFastify', () => {
     const response = await fetch(`${baseUrl}/broken`)
     expect(response.status).toBe(500)
     await vi.waitFor(
-      () => {
-        const span = collector.store.recentSpans(10).find((entry) => entry.statusCode === 500)
+      async () => {
+        const span = (await collector.store.recentSpans(10)).find((entry) => entry.statusCode === 500)
         expect(span?.error?.message).toBe('kaputt')
       },
       { timeout: 2000 }
@@ -62,8 +62,8 @@ describe('apiscopeFastify', () => {
   it('pushes the registry without HEAD duplicates', async () => {
     await startStack()
     await vi.waitFor(
-      () => {
-        const routes = collector.store.listRoutes()
+      async () => {
+        const routes = await collector.store.listRoutes()
         expect(routes).toContainEqual({ appName: 'fastify-demo', method: 'GET', pattern: '/items/:itemId' })
         expect(routes).toContainEqual({ appName: 'fastify-demo', method: 'POST', pattern: '/items' })
         expect(routes.every((route) => route.method !== 'HEAD')).toBe(true)

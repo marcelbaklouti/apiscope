@@ -1,16 +1,7 @@
 import { renameSync } from 'node:fs'
 import Database from 'better-sqlite3'
 import type { ChildSpan, RequestSpan, RouteRegistryEntry } from '@apiscope/core'
-
-export interface RouteStats {
-  routePattern: string | null
-  method: string
-  count: number
-  errorCount: number
-  p50: number
-  p95: number
-  p99: number
-}
+import type { RouteStats, SpanStore, StoredLoadRun, StoredLoadRunSummary } from './store-interface'
 
 interface SpanRow {
   id: string
@@ -127,20 +118,6 @@ function rowToChildSpan(row: ChildSpanRow): ChildSpan {
   return childSpan
 }
 
-export interface StoredLoadRun {
-  id: string
-  name: string
-  startedAt: number
-  scenarioJson: string
-  resultJson: string
-}
-
-export interface StoredLoadRunSummary {
-  id: string
-  name: string
-  startedAt: number
-}
-
 function isHealthy(db: Database.Database): boolean {
   const result = db.pragma('integrity_check') as Array<{ integrity_check: string }>
   return result[0]?.integrity_check === 'ok'
@@ -158,7 +135,7 @@ function openDatabase(dbPath: string): { db: Database.Database; recovered: boole
   return { db: new Database(dbPath), recovered: true }
 }
 
-export class SpanStore {
+export class SqliteSpanStore implements SpanStore {
   private readonly db: Database.Database
   private readonly retentionRows: number
   readonly recoveredFromCorruption: boolean
@@ -172,7 +149,9 @@ export class SpanStore {
     this.retentionRows = options.retentionRows ?? 50000
   }
 
-  insertBatch(appName: string, batch: { spans: RequestSpan[]; childSpans: ChildSpan[] }): void {
+  async init(): Promise<void> {}
+
+  async insertBatch(appName: string, batch: { spans: RequestSpan[]; childSpans: ChildSpan[] }): Promise<void> {
     const insertSpan = this.db.prepare(
       `INSERT OR REPLACE INTO spans
        (id, trace_id, method, route_pattern, actual_path, status_code, start_time, ttfb, duration, framework, runtime, error_json, request_json, response_json, app_name)
@@ -233,7 +212,7 @@ export class SpanStore {
     transaction()
   }
 
-  replaceRoutes(appName: string, routes: RouteRegistryEntry[]): void {
+  async replaceRoutes(appName: string, routes: RouteRegistryEntry[]): Promise<void> {
     const clear = this.db.prepare(`DELETE FROM routes WHERE app_name = ?`)
     const insert = this.db.prepare(
       `INSERT INTO routes (app_name, method, pattern, source_file) VALUES (@appName, @method, @pattern, @sourceFile)`
@@ -247,7 +226,7 @@ export class SpanStore {
     transaction()
   }
 
-  listRoutes(): Array<{ appName: string } & RouteRegistryEntry> {
+  async listRoutes(): Promise<Array<{ appName: string } & RouteRegistryEntry>> {
     const rows = this.db
       .prepare(`SELECT app_name, method, pattern, source_file FROM routes ORDER BY app_name, pattern, method`)
       .all() as Array<{ app_name: string; method: string; pattern: string; source_file: string | null }>
@@ -262,14 +241,14 @@ export class SpanStore {
     })
   }
 
-  recentSpans(limit: number): RequestSpan[] {
+  async recentSpans(limit: number): Promise<RequestSpan[]> {
     const rows = this.db
       .prepare(`SELECT * FROM spans ORDER BY rowid DESC LIMIT ?`)
       .all(limit) as SpanRow[]
     return rows.map(rowToSpan)
   }
 
-  spanById(id: string): { span: RequestSpan; childSpans: ChildSpan[] } | null {
+  async spanById(id: string): Promise<{ span: RequestSpan; childSpans: ChildSpan[] } | null> {
     const row = this.db.prepare(`SELECT * FROM spans WHERE id = ?`).get(id) as SpanRow | undefined
     if (row === undefined) return null
     const childRows = this.db
@@ -278,7 +257,7 @@ export class SpanStore {
     return { span: rowToSpan(row), childSpans: childRows.map(rowToChildSpan) }
   }
 
-  routeStats(): RouteStats[] {
+  async routeStats(): Promise<RouteStats[]> {
     const groups = this.db
       .prepare(
         `SELECT route_pattern, method, COUNT(*) AS count, SUM(CASE WHEN status_code >= 500 THEN 1 ELSE 0 END) AS errorCount
@@ -304,7 +283,7 @@ export class SpanStore {
     }))
   }
 
-  insertLoadRun(run: StoredLoadRun): void {
+  async insertLoadRun(run: StoredLoadRun): Promise<void> {
     this.db
       .prepare(
         `INSERT OR REPLACE INTO load_runs (id, name, started_at, scenario_json, result_json)
@@ -313,13 +292,13 @@ export class SpanStore {
       .run(run)
   }
 
-  listLoadRuns(): StoredLoadRunSummary[] {
+  async listLoadRuns(): Promise<StoredLoadRunSummary[]> {
     return this.db
       .prepare(`SELECT id, name, started_at AS startedAt FROM load_runs ORDER BY started_at DESC`)
       .all() as StoredLoadRunSummary[]
   }
 
-  loadRunById(id: string): StoredLoadRun | null {
+  async loadRunById(id: string): Promise<StoredLoadRun | null> {
     const row = this.db
       .prepare(
         `SELECT id, name, started_at AS startedAt, scenario_json AS scenarioJson, result_json AS resultJson
@@ -329,7 +308,7 @@ export class SpanStore {
     return row ?? null
   }
 
-  close(): void {
+  async close(): Promise<void> {
     this.db.close()
   }
 }

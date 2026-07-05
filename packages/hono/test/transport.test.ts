@@ -35,8 +35,8 @@ describe('HttpCollectorTransport', () => {
     await transport.ensureHandshake([{ method: 'GET', pattern: '/x' }])
     await transport.ensureHandshake([{ method: 'GET', pattern: '/x' }])
     await transport.sendBatch({ spans: [span('a')], childSpans: [], droppedCount: 0 })
-    expect(collector.store.listRoutes()).toHaveLength(1)
-    expect(collector.store.spanById('a')).not.toBeNull()
+    expect(await collector.store.listRoutes()).toHaveLength(1)
+    expect(await collector.store.spanById('a')).not.toBeNull()
   })
 
   it('accumulates dropped counts across failed sends', async () => {
@@ -55,7 +55,7 @@ describe('HttpCollectorTransport', () => {
     Object.assign(unreachable, { ingestUrl: `http://127.0.0.1:${port}/ingest` })
     await unreachable.ensureHandshake([])
     await unreachable.sendBatch({ spans: [span('kept')], childSpans: [], droppedCount: 0 })
-    expect(collector.store.spanById('kept')).not.toBeNull()
+    expect(await collector.store.spanById('kept')).not.toBeNull()
     expect(droppedEvents).toEqual([{ type: 'dropped', appName: 'hono-demo', droppedCount: 2 }])
     expect(PROTOCOL_VERSION).toBe(1)
   })

@@ -77,7 +77,7 @@ describe('WebSocket ingest and live subscriptions', () => {
     )
     expect(await ingestMessages.next()).toEqual({ accepted: true })
     expect(await liveMessages.next()).toEqual({ type: 'spans', appName: 'ws-app', spans: [sampleSpan], childSpans: [] })
-    expect(collector.store.spanById('w1')).not.toBeNull()
+    expect(await collector.store.spanById('w1')).not.toBeNull()
 
     ingest.close()
     expect(await liveMessages.next()).toEqual({ type: 'app-disconnected', appName: 'ws-app' })

@@ -11,7 +11,7 @@ export interface CollectorOptions {
 
 export type RouteHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => void | Promise<void>
 
-export type DynamicHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => boolean
+export type DynamicHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => boolean | Promise<boolean>
 
 export function sendJson(response: ServerResponse, statusCode: number, body: unknown): void {
   const payload = JSON.stringify(body)
@@ -38,7 +38,7 @@ export function createHttpServer(routes: Map<string, RouteHandler>, dynamicHandl
       return
     }
     for (const dynamicHandler of dynamicHandlers) {
-      if (dynamicHandler(request, response, url)) return
+      if (await dynamicHandler(request, response, url)) return
     }
     sendJson(response, 404, { error: 'not-found' })
   })

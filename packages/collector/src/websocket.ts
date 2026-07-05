@@ -10,9 +10,10 @@ export function attachWebSockets(server: Server, processor: IngestProcessor, hub
   ingestServer.on('connection', (socket: WebSocket) => {
     const session: IngestSession = { appName: null }
     socket.on('message', (data) => {
-      const result = processor.process(String(data), session)
-      if (result.ok) socket.send(JSON.stringify({ accepted: true }))
-      else socket.send(JSON.stringify({ error: result.error }))
+      void processor.process(String(data), session).then((result) => {
+        if (result.ok) socket.send(JSON.stringify({ accepted: true }))
+        else socket.send(JSON.stringify({ error: result.error }))
+      })
     })
     socket.on('close', () => {
       if (session.appName !== null) hub.publish({ type: 'app-disconnected', appName: session.appName })

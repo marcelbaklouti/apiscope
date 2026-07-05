@@ -79,7 +79,7 @@ export async function runCi(options: CiOptions): Promise<CiRun> {
     for (const entry of ci.scenarios) {
       log(`running scenario ${entry.scenario.name}`)
       const result = await runLoadTest(entry.scenario)
-      collector.store.insertLoadRun({
+      await collector.store.insertLoadRun({
         id: randomUUID(),
         name: entry.scenario.name,
         startedAt: Date.now(),
@@ -89,7 +89,7 @@ export async function runCi(options: CiOptions): Promise<CiRun> {
       results.push({ name: entry.scenario.name, result })
       scenarios.push({ name: entry.scenario.name, result, assertionOutcomes: [], diffOutcomes: [] })
     }
-    const currentRoutes = collector.store.listRoutes().map((route) => ({
+    const currentRoutes = (await collector.store.listRoutes()).map((route) => ({
       appName: route.appName,
       method: route.method,
       pattern: route.pattern

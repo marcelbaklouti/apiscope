@@ -12,7 +12,7 @@ const collector = createCollector({
 
 await collector.listen()
 
-collector.store.replaceRoutes('seed-app', [
+await collector.store.replaceRoutes('seed-app', [
   { method: 'GET', pattern: '/api/users/:id', sourceFile: 'app/api/users/[id]/route.ts' },
   { method: 'POST', pattern: '/api/orders' }
 ])
@@ -36,7 +36,7 @@ const spans = Array.from({ length: 40 }, (unused, index) => ({
   }
 }))
 
-collector.store.insertBatch('seed-app', {
+await collector.store.insertBatch('seed-app', {
   spans,
   childSpans: [
     {
