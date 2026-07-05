@@ -150,6 +150,28 @@ importers:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@26.1.0)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.27.7))
 
+  packages/hono:
+    dependencies:
+      '@apiscope/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@apiscope/collector':
+        specifier: workspace:*
+        version: link:../collector
+      hono:
+        specifier: ^4.12.27
+        version: 4.12.27
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.16)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.1.0)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.27.7))
+
   packages/nestjs:
     dependencies:
       '@apiscope/adapter-node':
@@ -1346,6 +1368,10 @@ packages:
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
+
+  hono@4.12.27:
+    resolution: {integrity: sha512-1yrb/+w6HWQJrUCLkJ2IF5jNIPvvFkblV5RNOYl6bV+OA6p9GLcMpHFFGTosSvHvcAUibuUukRqhlYI4z32C7Q==}
+    engines: {node: '>=16.9.0'}
 
   http-errors@2.0.1:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
@@ -3053,6 +3079,8 @@ snapshots:
   hasown@2.0.4:
     dependencies:
       function-bind: 1.1.2
+
+  hono@4.12.27: {}
 
   http-errors@2.0.1:
     dependencies:
