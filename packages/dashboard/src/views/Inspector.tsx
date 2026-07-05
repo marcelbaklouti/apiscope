@@ -8,6 +8,12 @@ function waterfallRowLabel(child: Child): string {
   return child.kind === 'db' ? `${child.system} · ${child.statement}` : `${child.method} ${child.url}`
 }
 
+function waterfallRowBarColor(kind: 'root' | 'db' | 'fetch'): string {
+  if (kind === 'root') return 'var(--text-dim)'
+  if (kind === 'db') return 'var(--kind-db)'
+  return 'var(--status-3xx)'
+}
+
 function Waterfall({ span, childSpans }: { span: Span; childSpans: Child[] }) {
   const total = Math.max(span.timing.duration, 1)
   const rows = [
@@ -27,9 +33,21 @@ function Waterfall({ span, childSpans }: { span: Span; childSpans: Child[] }) {
         <div
           key={index}
           data-testid={row.kind === 'db' ? 'waterfall-row-db' : row.kind === 'fetch' ? 'waterfall-row-fetch' : 'waterfall-row-root'}
-          style={{ display: 'grid', gridTemplateColumns: '260px 1fr 70px 60px', gap: 8, alignItems: 'center' }}
+          className="waterfall-row"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '260px 1fr 70px 60px',
+            gap: 8,
+            alignItems: 'center',
+            paddingLeft: row.root ? 0 : 16,
+            borderLeft: row.root ? 'none' : '1px solid var(--border-hairline)',
+            marginLeft: row.root ? 0 : 4
+          }}
         >
-          <span className="mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span
+            className="mono"
+            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: row.root ? 600 : 400 }}
+          >
             {row.label}
           </span>
           <div style={{ position: 'relative', height: 10, background: 'var(--bg)' }}>
@@ -40,7 +58,7 @@ function Waterfall({ span, childSpans }: { span: Span; childSpans: Child[] }) {
                 width: `${Math.max((row.duration / total) * 100, 0.5)}%`,
                 top: 2,
                 bottom: 2,
-                background: row.root ? 'var(--text-dim)' : row.kind === 'db' ? 'var(--accent)' : 'var(--status-3xx)'
+                background: waterfallRowBarColor(row.kind)
               }}
             />
           </div>

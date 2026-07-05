@@ -10,6 +10,7 @@
   --status-3xx: #7c8b9e;
   --status-4xx: #d9a621;
   --status-5xx: #dc5252;
+  --kind-db: #9b8fb0;
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
@@ -40,4 +41,5 @@
   --status-3xx: #4a6484;
   --status-4xx: #8f6a00;
   --status-5xx: #b32d2d;
+  --kind-db: #6f6183;
 }

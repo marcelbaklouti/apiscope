@@ -45,3 +45,18 @@ export interface LoadProgress {
   errorCount: number
   latencyP95: number
 }
+
+export interface FlameNode {
+  name: string
+  file: string
+  line: number
+  value: number
+  children: FlameNode[]
+}
+
+export interface StoredProfile {
+  id: string
+  appName: string
+  capturedAt: number
+  flamegraph: FlameNode
+}

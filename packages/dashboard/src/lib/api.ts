@@ -1,4 +1,4 @@
-import type { RouteEntry, RouteStatsEntry, RunDetail, RunSummary, Span, SpanDetail } from './types'
+import type { RouteEntry, RouteStatsEntry, RunDetail, RunSummary, Span, SpanDetail, StoredProfile } from './types'
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path)
@@ -24,5 +24,16 @@ export const api = {
     })
     if (!response.ok) throw new Error(((await response.json()) as { error: string }).error)
     return (await response.json()) as { runId: string }
-  }
+  },
+  startProfile: async (appName: string, durationMs: number): Promise<{ profileId: string }> => {
+    const response = await fetch('/api/profiles', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ appName, durationMs })
+    })
+    if (!response.ok) throw new Error(((await response.json()) as { error: string }).error)
+    return (await response.json()) as { profileId: string }
+  },
+  profileById: (id: string) => getJson<StoredProfile>(`/api/profiles/${encodeURIComponent(id)}`),
+  profilePprofUrl: (id: string) => `/api/profiles/${encodeURIComponent(id)}/pprof`
 }

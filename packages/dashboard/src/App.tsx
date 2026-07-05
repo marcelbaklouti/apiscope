@@ -11,6 +11,7 @@ import { LoadView } from './views/LoadView'
 import { Runs } from './views/Runs'
 import { ConfigView } from './views/ConfigView'
 import { Login } from './views/Login'
+import { Flamegraph } from './views/Flamegraph'
 
 function useTheme(): [string, () => void] {
   const [theme, setTheme] = useState(() => localStorage.getItem('apiscope-theme') ?? 'dark')
@@ -71,6 +72,7 @@ function DashboardShell() {
           <Link to="/">Overview</Link>
           <Link to="/routes">Routes</Link>
           <Link to="/inspector">Inspector</Link>
+          <Link to="/flamegraph">Flamegraph</Link>
           <Link to="/load">Load</Link>
           <Link to="/runs">Runs</Link>
           <Link to="/config">Config</Link>
@@ -98,6 +100,7 @@ function DashboardShell() {
         {view === 'routes' && <Routes />}
         {view === 'inspector' && segments[1] === 'run' && <Inspector spanId={segments[3] ?? null} loadRunId={segments[2] ?? null} />}
         {view === 'inspector' && segments[1] !== 'run' && <Inspector spanId={segments[1] ?? null} />}
+        {view === 'flamegraph' && <Flamegraph />}
         {view === 'load' && <LoadView />}
         {view === 'runs' && <Runs runId={segments[1] ?? null} />}
         {view === 'config' && <ConfigView />}
