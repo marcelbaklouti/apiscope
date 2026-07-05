@@ -33,7 +33,11 @@
   "dependencies": {
     "@apiscope/core": "workspace:*",
     "@apiscope/load": "workspace:*",
+    "argon2": "^0.44.0",
     "better-sqlite3": "^12.11.1",
+    "cookie": "^2.0.1",
+    "jose": "^6.2.3",
+    "openid-client": "^6.8.4",
     "ws": "^8.21.0"
   },
   "optionalDependencies": {
