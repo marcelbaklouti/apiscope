@@ -6,6 +6,13 @@ export type LiveEvent =
   | { type: 'app-connected'; app: AppMetadata }
   | { type: 'app-disconnected'; appName: string }
   | { type: 'dropped'; appName: string; droppedCount: number }
+  | {
+      type: 'load-progress'
+      runId: string
+      name: string
+      snapshot: { totalRequests: number; errorCount: number; latencyP95: number }
+    }
+  | { type: 'load-finished'; runId: string; ok: boolean }
 
 export class LiveHub {
   private readonly listeners = new Set<(event: LiveEvent) => void>()

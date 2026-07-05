@@ -5,6 +5,8 @@ export interface CollectorOptions {
   host?: string
   port?: number
   retentionRows?: number
+  dashboardDir?: string
+  meta?: unknown
 }
 
 export type RouteHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => void | Promise<void>
@@ -23,7 +25,7 @@ export async function readBody(request: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-export function createHttpServer(routes: Map<string, RouteHandler>, dynamicHandler?: DynamicHandler): Server {
+export function createHttpServer(routes: Map<string, RouteHandler>, dynamicHandlers: DynamicHandler[] = []): Server {
   return createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost')
     const handler = routes.get(`${request.method} ${url.pathname}`)
@@ -35,7 +37,9 @@ export function createHttpServer(routes: Map<string, RouteHandler>, dynamicHandl
       }
       return
     }
-    if (dynamicHandler?.(request, response, url)) return
+    for (const dynamicHandler of dynamicHandlers) {
+      if (dynamicHandler(request, response, url)) return
+    }
     sendJson(response, 404, { error: 'not-found' })
   })
 }

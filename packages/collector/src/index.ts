@@ -1,9 +1,11 @@
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { IngestProcessor } from './ingest'
 import { LiveHub } from './live-hub'
+import { startLoadRun, type LoadRunRequest } from './load-runs'
+import { createStaticHandler } from './static'
 import { SpanStore } from './store'
 import { attachWebSockets } from './websocket'
-import { createHttpServer, readBody, sendJson, type CollectorOptions, type RouteHandler } from './server'
+import { createHttpServer, readBody, sendJson, type CollectorOptions, type DynamicHandler, type RouteHandler } from './server'
 
 export type { CollectorOptions }
 export { SpanStore } from './store'
@@ -48,14 +50,55 @@ export function createCollector(options: CollectorOptions): Collector {
   })
   routes.set('GET /api/routes', (request, response) => sendJson(response, 200, store.listRoutes()))
   routes.set('GET /api/route-stats', (request, response) => sendJson(response, 200, store.routeStats()))
-  const server: Server = createHttpServer(routes, (request, response, url) => {
+  routes.set('GET /api/meta', (request, response) => sendJson(response, 200, { meta: options.meta ?? null }))
+  routes.set('GET /api/load-runs', (request, response) => sendJson(response, 200, store.listLoadRuns()))
+  routes.set('POST /api/load-runs', async (request, response) => {
+    const raw = await readBody(request)
+    try {
+      const parsed = JSON.parse(raw) as LoadRunRequest
+      const { runId } = startLoadRun(parsed, store, hub)
+      sendJson(response, 202, { runId })
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : 'invalid request' })
+    }
+  })
+  const spanDetailHandler: DynamicHandler = (request, response, url) => {
     const match = url.pathname.match(/^\/api\/spans\/([^/]+)$/)
     if (request.method !== 'GET' || match === null || match[1] === undefined) return false
     const detail = store.spanById(decodeURIComponent(match[1]))
     if (detail === null) sendJson(response, 404, { error: 'not-found' })
     else sendJson(response, 200, detail)
     return true
-  })
+  }
+  const loadRunDetailHandler: DynamicHandler = (request, response, url) => {
+    const match = url.pathname.match(/^\/api\/load-runs\/([^/]+)$/)
+    if (request.method !== 'GET' || match === null || match[1] === undefined) return false
+    const stored = store.loadRunById(decodeURIComponent(match[1]))
+    if (stored === null) {
+      sendJson(response, 404, { error: 'not-found' })
+      return true
+    }
+    const { scenario, assertions } = JSON.parse(stored.scenarioJson) as {
+      scenario: unknown
+      assertions: unknown
+    }
+    const result = JSON.parse(stored.resultJson) as unknown
+    sendJson(response, 200, {
+      id: stored.id,
+      name: stored.name,
+      startedAt: stored.startedAt,
+      scenario,
+      assertions,
+      result
+    })
+    return true
+  }
+  const dynamicHandlers: DynamicHandler[] = [
+    spanDetailHandler,
+    loadRunDetailHandler,
+    ...(options.dashboardDir === undefined ? [] : [createStaticHandler(options.dashboardDir)])
+  ]
+  const server: Server = createHttpServer(routes, dynamicHandlers)
   attachWebSockets(server, processor, hub)
   return {
     store,

@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { createCollector } from '@apiscope/collector'
@@ -60,11 +61,20 @@ async function runDev(configPath: string | null): Promise<void> {
   const config = await resolveConfig(configPath, cwd)
   const dbPath = config.collector?.dbPath ?? join(cwd, '.apiscope', 'apiscope.db')
   mkdirSync(dirname(dbPath), { recursive: true })
+  let dashboardDir: string | undefined
+  try {
+    const require = createRequire(import.meta.url)
+    dashboardDir = join(dirname(require.resolve('@apiscope/dashboard/package.json')), 'dist')
+  } catch {
+    console.log('dashboard package not found; api only')
+  }
   const collector = createCollector({
     dbPath,
     ...(config.collector?.host === undefined ? {} : { host: config.collector.host }),
     port: config.collector?.port ?? 4620,
-    ...(config.collector?.retentionRows === undefined ? {} : { retentionRows: config.collector.retentionRows })
+    ...(config.collector?.retentionRows === undefined ? {} : { retentionRows: config.collector.retentionRows }),
+    ...(dashboardDir === undefined ? {} : { dashboardDir }),
+    meta: config
   })
   const address = await collector.listen()
   if (collector.store.recoveredFromCorruption) {

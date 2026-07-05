@@ -25,6 +25,7 @@
   "dependencies": {
     "@apiscope/collector": "workspace:*",
     "@apiscope/core": "workspace:*",
+    "@apiscope/dashboard": "workspace:*",
     "@apiscope/load": "workspace:*",
     "jiti": "^2.7.0",
     "zod": "^4.4.3"
