@@ -1,0 +1,115 @@
+import { createJiti } from 'jiti'
+import { z } from 'zod'
+import type { LoadAssertions, LoadScenario } from '@apiscope/load'
+
+const targetSchema = z.object({
+  method: z.string(),
+  path: z.string(),
+  headers: z.record(z.string(), z.string()).optional(),
+  body: z.string().optional(),
+  weight: z.number().positive().optional(),
+  label: z.string().optional()
+})
+
+const modelSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('open'),
+    phases: z.array(z.object({ durationMs: z.number().positive(), rps: z.number().positive() })).min(1)
+  }),
+  z.object({
+    kind: z.literal('closed'),
+    concurrency: z.number().int().positive(),
+    durationMs: z.number().positive()
+  })
+])
+
+const scenarioSchema = z.object({
+  name: z.string().min(1),
+  baseUrl: z.url(),
+  targets: z.array(targetSchema).min(1),
+  model: modelSchema,
+  warmupMs: z.number().nonnegative().optional(),
+  workers: z.number().int().positive().optional(),
+  allowRemoteHosts: z.array(z.string()).optional(),
+  hooksModule: z.string().optional()
+})
+
+const assertionsSchema = z.object({
+  p50MaxMs: z.number().positive().optional(),
+  p95MaxMs: z.number().positive().optional(),
+  p99MaxMs: z.number().positive().optional(),
+  errorRateMax: z.number().min(0).max(1).optional(),
+  achievedRpsMin: z.number().positive().optional()
+})
+
+const configSchema = z.object({
+  collector: z
+    .object({
+      host: z.string().optional(),
+      port: z.number().int().positive().optional(),
+      dbPath: z.string().optional(),
+      retentionRows: z.number().int().positive().optional()
+    })
+    .optional(),
+  ci: z
+    .object({
+      readiness: z.object({
+        url: z.url(),
+        timeoutMs: z.number().positive().optional(),
+        intervalMs: z.number().positive().optional()
+      }),
+      baselinePath: z.string().optional(),
+      tolerances: z
+        .object({
+          p50Pct: z.number().nonnegative().optional(),
+          p95Pct: z.number().nonnegative().optional(),
+          p99Pct: z.number().nonnegative().optional(),
+          errorRateAbs: z.number().nonnegative().optional()
+        })
+        .optional(),
+      failOnRouteDrift: z.boolean().optional(),
+      scenarios: z.array(z.object({ scenario: scenarioSchema, assertions: assertionsSchema.optional() })).min(1)
+    })
+    .optional()
+})
+
+export interface ApiscopeConfig {
+  collector?: { host?: string; port?: number; dbPath?: string; retentionRows?: number }
+  ci?: {
+    readiness: { url: string; timeoutMs?: number; intervalMs?: number }
+    baselinePath?: string
+    tolerances?: { p50Pct?: number; p95Pct?: number; p99Pct?: number; errorRateAbs?: number }
+    failOnRouteDrift?: boolean
+    scenarios: Array<{ scenario: LoadScenario; assertions?: LoadAssertions }>
+  }
+}
+
+export class ConfigError extends Error {}
+
+export function defineConfig(config: ApiscopeConfig): ApiscopeConfig {
+  return config
+}
+
+export function formatIssuePath(path: Array<string | number>): string {
+  if (path.length === 0) return 'config'
+  return path
+    .map((segment, index) => (typeof segment === 'number' ? `[${segment}]` : index === 0 ? segment : `.${segment}`))
+    .join('')
+}
+
+export async function loadConfig(configPath: string): Promise<ApiscopeConfig> {
+  const jiti = createJiti(import.meta.url)
+  const moduleNamespace = (await jiti.import(configPath)) as Record<string, unknown>
+  if (!('default' in moduleNamespace)) {
+    throw new ConfigError(`config at ${configPath} has no default export`)
+  }
+  const loaded = moduleNamespace.default
+  const parsed = configSchema.safeParse(loaded)
+  if (!parsed.success) {
+    const details = parsed.error.issues
+      .map((issue) => `${formatIssuePath(issue.path as unknown as Array<string | number>)}: ${issue.message}`)
+      .join('; ')
+    throw new ConfigError(`invalid apiscope config: ${details}`)
+  }
+  return parsed.data as ApiscopeConfig
+}
