@@ -22,6 +22,8 @@ export interface CapturedPayload {
 export interface RequestSpan {
   id: string
   traceId: string
+  parentSpanId?: string
+  loadRunId?: string
   method: string
   routePattern: string | null
   actualPath: string

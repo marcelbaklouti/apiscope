@@ -74,6 +74,8 @@ export function validateRequestSpan(value: unknown): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   requireString(issues, value, 'id', '')
   requireString(issues, value, 'traceId', '')
+  optionalString(issues, value, 'parentSpanId', '')
+  optionalString(issues, value, 'loadRunId', '')
   requireString(issues, value, 'method', '')
   if (value['routePattern'] !== null && typeof value['routePattern'] !== 'string') {
     issues.push({ path: 'routePattern', expected: 'string | null' })
