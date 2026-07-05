@@ -117,13 +117,18 @@ export class ClickHouseSpanStore implements SpanStore {
           parent_span_id: child.parentSpanId,
           trace_id: child.traceId,
           kind: child.kind,
-          url: child.url,
-          method: child.method,
-          status_code: child.statusCode,
+          url: child.kind === 'fetch' ? child.url : null,
+          method: child.kind === 'fetch' ? child.method : null,
+          status_code: child.kind === 'fetch' ? child.statusCode : null,
           start_time: child.timing.start,
           ttfb: child.timing.ttfb,
           duration: child.timing.duration,
-          error_json: child.error === undefined ? null : JSON.stringify(child.error)
+          error_json: child.error === undefined ? null : JSON.stringify(child.error),
+          db_system: child.kind === 'db' ? child.system : null,
+          db_statement: child.kind === 'db' ? child.statement : null,
+          db_operation: child.kind === 'db' ? child.operation : null,
+          db_target: child.kind === 'db' ? child.target : null,
+          db_row_count: child.kind === 'db' ? child.rowCount : null
         }))
       })
     }
@@ -198,27 +203,45 @@ export class ClickHouseSpanStore implements SpanStore {
       parent_span_id: string
       trace_id: string
       kind: string
-      url: string
-      method: string
+      url: string | null
+      method: string | null
       status_code: number | null
       start_time: number
       ttfb: number | null
       duration: number
       error_json: string | null
+      db_system: string | null
+      db_statement: string | null
+      db_operation: string | null
+      db_target: string | null
+      db_row_count: number | string | null
     }>
     const childSpans: ChildSpan[] = childRows.map((row) => {
-      const child: ChildSpan = {
+      const base = {
         id: row.id,
         parentSpanId: row.parent_span_id,
         traceId: row.trace_id,
-        kind: 'fetch',
-        url: row.url,
-        method: row.method,
-        statusCode: row.status_code === null ? null : Number(row.status_code),
-        timing: { start: Number(row.start_time), ttfb: row.ttfb === null ? null : Number(row.ttfb), duration: Number(row.duration) }
+        timing: { start: Number(row.start_time), ttfb: row.ttfb === null ? null : Number(row.ttfb), duration: Number(row.duration) },
+        ...(row.error_json === null ? {} : { error: JSON.parse(row.error_json) })
       }
-      if (row.error_json !== null) child.error = JSON.parse(row.error_json)
-      return child
+      if (row.kind === 'db') {
+        return {
+          ...base,
+          kind: 'db' as const,
+          system: row.db_system ?? '',
+          statement: row.db_statement ?? '',
+          operation: row.db_operation ?? '',
+          target: row.db_target,
+          rowCount: row.db_row_count === null ? null : Number(row.db_row_count)
+        }
+      }
+      return {
+        ...base,
+        kind: 'fetch' as const,
+        url: row.url ?? '',
+        method: row.method ?? '',
+        statusCode: row.status_code === null ? null : Number(row.status_code)
+      }
     })
     return { span: rowToSpan(first), childSpans }
   }

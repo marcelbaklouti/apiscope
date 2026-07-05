@@ -44,6 +44,37 @@ export function runStoreConformance(
       await store.close()
     })
 
+    it('persists a db child span alongside a fetch child span', async () => {
+      const store = await createStore()
+      await store.init()
+      const parent = span({ id: 'p-db' })
+      await store.insertBatch('demo', {
+        spans: [parent],
+        childSpans: [
+          { id: 'c-fetch', parentSpanId: 'p-db', traceId: 'trace', kind: 'fetch', url: 'http://x', method: 'GET', statusCode: 200, timing: { start: 1001, ttfb: 1, duration: 3 } },
+          {
+            id: 'c-db',
+            parentSpanId: 'p-db',
+            traceId: 'trace',
+            kind: 'db',
+            system: 'postgresql',
+            statement: 'SELECT * FROM users WHERE id = $1',
+            operation: 'SELECT',
+            target: 'appdb',
+            rowCount: 1,
+            timing: { start: 1002, ttfb: null, duration: 2 }
+          }
+        ]
+      })
+      const loaded = await store.spanById('p-db')
+      expect(loaded?.childSpans).toHaveLength(2)
+      const dbChild = loaded?.childSpans.find((child) => child.kind === 'db')
+      expect(dbChild?.kind === 'db' && dbChild.system).toEqual('postgresql')
+      expect(dbChild?.kind === 'db' && dbChild.statement).toEqual('SELECT * FROM users WHERE id = $1')
+      expect(dbChild?.kind === 'db' && dbChild.rowCount).toEqual(1)
+      await store.close()
+    })
+
     it('persists spans carrying a parent span id and load-run id', async () => {
       const store = await createStore()
       await store.init()

@@ -36,17 +36,31 @@ export interface RequestSpan {
   response?: CapturedPayload
 }
 
-export interface ChildSpan {
+interface ChildSpanBase {
   id: string
   parentSpanId: string
   traceId: string
+  timing: SpanTiming
+  error?: SpanError
+}
+
+export interface FetchChildSpan extends ChildSpanBase {
   kind: 'fetch'
   url: string
   method: string
   statusCode: number | null
-  timing: SpanTiming
-  error?: SpanError
 }
+
+export interface DbChildSpan extends ChildSpanBase {
+  kind: 'db'
+  system: string
+  statement: string
+  operation: string
+  target: string | null
+  rowCount: number | null
+}
+
+export type ChildSpan = FetchChildSpan | DbChildSpan
 
 export interface RouteRegistryEntry {
   method: string

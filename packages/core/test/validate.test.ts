@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { validateChildSpan, validateRequestSpan, validateRouteRegistryEntry } from '../src/validate'
-import type { ChildSpan, RequestSpan } from '../src/types'
+import type { ChildSpan, DbChildSpan, RequestSpan } from '../src/types'
 
 export const validRequestSpan: RequestSpan = {
   id: 'span-1',
@@ -23,6 +23,19 @@ export const validChildSpan: ChildSpan = {
   method: 'GET',
   statusCode: 200,
   timing: { start: 1751630000010, ttfb: 8, duration: 20 }
+}
+
+export const validDbChildSpan: DbChildSpan = {
+  id: 'child-2',
+  parentSpanId: 'span-1',
+  traceId: 'trace-1',
+  kind: 'db',
+  system: 'postgresql',
+  statement: 'SELECT * FROM users WHERE id = $1',
+  operation: 'SELECT',
+  target: 'appdb',
+  rowCount: 1,
+  timing: { start: 1751630000020, ttfb: null, duration: 4 }
 }
 
 describe('validateRequestSpan', () => {
@@ -70,6 +83,23 @@ describe('validateChildSpan', () => {
   it('rejects missing parentSpanId', () => {
     const { parentSpanId, ...rest } = validChildSpan
     expect(validateChildSpan(rest)).toContainEqual({ path: 'parentSpanId', expected: 'string' })
+  })
+
+  it('accepts a valid db child span', () => {
+    expect(validateChildSpan(validDbChildSpan)).toEqual([])
+  })
+
+  it('accepts null target and rowCount on a db child span', () => {
+    expect(validateChildSpan({ ...validDbChildSpan, target: null, rowCount: null })).toEqual([])
+  })
+
+  it('rejects an unknown kind', () => {
+    expect(validateChildSpan({ ...validChildSpan, kind: 'grpc' })).toContainEqual({ path: 'kind', expected: 'fetch | db' })
+  })
+
+  it('rejects a db child span missing statement', () => {
+    const { statement, ...rest } = validDbChildSpan
+    expect(validateChildSpan(rest)).toContainEqual({ path: 'statement', expected: 'string' })
   })
 })
 

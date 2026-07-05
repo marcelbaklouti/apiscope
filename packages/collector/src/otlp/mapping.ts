@@ -97,8 +97,7 @@ function requestSpanToOtlp(span: RequestSpan): OtlpSpan {
   }
 }
 
-function childSpanToOtlp(child: ChildSpan): OtlpSpan {
-  const start = child.timing.start
+function fetchChildAttributes(child: Extract<ChildSpan, { kind: 'fetch' }>): OtlpKeyValue[] {
   const attributes: OtlpKeyValue[] = [
     stringAttribute('http.request.method', child.method),
     stringAttribute('url.full', child.url),
@@ -107,11 +106,32 @@ function childSpanToOtlp(child: ChildSpan): OtlpSpan {
   if (child.statusCode !== null && child.statusCode !== undefined) {
     attributes.push(intAttribute('http.response.status_code', child.statusCode))
   }
+  return attributes
+}
+
+function dbChildAttributes(child: Extract<ChildSpan, { kind: 'db' }>): OtlpKeyValue[] {
+  const attributes: OtlpKeyValue[] = [
+    stringAttribute('db.system.name', child.system),
+    stringAttribute('db.query.text', child.statement),
+    stringAttribute('db.operation.name', child.operation),
+    stringAttribute('apiscope.child.kind', child.kind)
+  ]
+  if (child.target !== null) attributes.push(stringAttribute('server.address', child.target))
+  return attributes
+}
+
+function childSpanName(child: ChildSpan): string {
+  return child.kind === 'fetch' ? `${child.method} ${child.url}` : `${child.operation} ${child.target ?? child.system}`
+}
+
+function childSpanToOtlp(child: ChildSpan): OtlpSpan {
+  const start = child.timing.start
+  const attributes = child.kind === 'fetch' ? fetchChildAttributes(child) : dbChildAttributes(child)
   return {
     traceId: normalizeTraceId(child.traceId),
     spanId: normalizeSpanId(child.id),
     parentSpanId: normalizeSpanId(child.parentSpanId),
-    name: `${child.method} ${child.url}`,
+    name: childSpanName(child),
     kind: 3,
     startTimeUnixNano: millisToNano(start),
     endTimeUnixNano: millisToNano(start + child.timing.duration),
@@ -174,19 +194,39 @@ export function exportRequestToSpans(request: OtlpExportTraceServiceRequest): {
           }
           spans.push(requestSpan)
         } else {
-          const method = findString(otlpSpan.attributes, 'http.request.method', 'http.method') ?? 'GET'
-          const url = findString(otlpSpan.attributes, 'url.full', 'url.path', 'db.query.text', 'db.statement') ?? otlpSpan.name
-          const statusCode = findInt(otlpSpan.attributes, 'http.response.status_code', 'http.status_code') ?? null
-          childSpans.push({
-            id: otlpSpan.spanId,
-            parentSpanId: otlpSpan.parentSpanId ?? '',
-            traceId: otlpSpan.traceId,
-            kind: 'fetch',
-            url,
-            method,
-            statusCode,
-            timing: { start: startMillis, ttfb: null, duration: durationMillis }
-          })
+          const dbSystem = findString(otlpSpan.attributes, 'db.system.name', 'db.system')
+          if (dbSystem !== undefined) {
+            const statement = findString(otlpSpan.attributes, 'db.query.text', 'db.statement') ?? ''
+            const operation = findString(otlpSpan.attributes, 'db.operation.name', 'db.operation') ?? ''
+            const target = findString(otlpSpan.attributes, 'server.address', 'db.namespace') ?? null
+            const rowCount = findInt(otlpSpan.attributes, 'db.response.returned_rows')
+            childSpans.push({
+              id: otlpSpan.spanId,
+              parentSpanId: otlpSpan.parentSpanId ?? '',
+              traceId: otlpSpan.traceId,
+              kind: 'db',
+              system: dbSystem,
+              statement,
+              operation,
+              target,
+              rowCount: rowCount ?? null,
+              timing: { start: startMillis, ttfb: null, duration: durationMillis }
+            })
+          } else {
+            const method = findString(otlpSpan.attributes, 'http.request.method', 'http.method') ?? 'GET'
+            const url = findString(otlpSpan.attributes, 'url.full', 'url.path') ?? otlpSpan.name
+            const statusCode = findInt(otlpSpan.attributes, 'http.response.status_code', 'http.status_code') ?? null
+            childSpans.push({
+              id: otlpSpan.spanId,
+              parentSpanId: otlpSpan.parentSpanId ?? '',
+              traceId: otlpSpan.traceId,
+              kind: 'fetch',
+              url,
+              method,
+              statusCode,
+              timing: { start: startMillis, ttfb: null, duration: durationMillis }
+            })
+          }
         }
       }
     }

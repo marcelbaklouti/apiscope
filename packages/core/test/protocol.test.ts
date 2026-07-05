@@ -4,7 +4,7 @@ import { PROTOCOL_VERSION } from '../src/index'
 import { decodeWireMessage, encodeWireMessage } from '../src/protocol'
 import type { HandshakeMessage, SpanBatchMessage, WireMessage } from '../src/protocol'
 import type { RequestSpan } from '../src/types'
-import { validChildSpan, validRequestSpan } from './validate.test'
+import { validChildSpan, validDbChildSpan, validRequestSpan } from './validate.test'
 
 const handshake: HandshakeMessage = {
   type: 'handshake',
@@ -32,6 +32,18 @@ describe('encodeWireMessage and decodeWireMessage', () => {
       const decoded = decodeWireMessage(encodeWireMessage(message))
       expect(decoded).toEqual({ ok: true, message })
     }
+  })
+
+  it('round-trips a span batch carrying a db child span', () => {
+    const dbBatch: SpanBatchMessage = {
+      type: 'span-batch',
+      protocolVersion: PROTOCOL_VERSION,
+      spans: [validRequestSpan],
+      childSpans: [validChildSpan, validDbChildSpan],
+      droppedCount: 0
+    }
+    const decoded = decodeWireMessage(encodeWireMessage(dbBatch))
+    expect(decoded).toEqual({ ok: true, message: dbBatch })
   })
 
   it('rejects invalid json', () => {

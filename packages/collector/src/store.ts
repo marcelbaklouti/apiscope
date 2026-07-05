@@ -27,13 +27,18 @@ interface ChildSpanRow {
   parent_span_id: string
   trace_id: string
   kind: string
-  url: string
-  method: string
+  url: string | null
+  method: string | null
   status_code: number | null
   start_time: number
   ttfb: number | null
   duration: number
   error_json: string | null
+  db_system: string | null
+  db_statement: string | null
+  db_operation: string | null
+  db_target: string | null
+  db_row_count: number | null
 }
 
 const schema = `
@@ -63,13 +68,18 @@ CREATE TABLE IF NOT EXISTS child_spans (
   parent_span_id TEXT NOT NULL,
   trace_id TEXT NOT NULL,
   kind TEXT NOT NULL,
-  url TEXT NOT NULL,
-  method TEXT NOT NULL,
+  url TEXT,
+  method TEXT,
   status_code INTEGER,
   start_time REAL NOT NULL,
   ttfb REAL,
   duration REAL NOT NULL,
-  error_json TEXT
+  error_json TEXT,
+  db_system TEXT,
+  db_statement TEXT,
+  db_operation TEXT,
+  db_target TEXT,
+  db_row_count INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_child_parent ON child_spans(parent_span_id);
 CREATE TABLE IF NOT EXISTS routes (
@@ -110,18 +120,31 @@ function rowToSpan(row: SpanRow): RequestSpan {
 }
 
 function rowToChildSpan(row: ChildSpanRow): ChildSpan {
-  const childSpan: ChildSpan = {
+  const base = {
     id: row.id,
     parentSpanId: row.parent_span_id,
     traceId: row.trace_id,
-    kind: 'fetch',
-    url: row.url,
-    method: row.method,
-    statusCode: row.status_code,
-    timing: { start: row.start_time, ttfb: row.ttfb, duration: row.duration }
+    timing: { start: row.start_time, ttfb: row.ttfb, duration: row.duration },
+    ...(row.error_json === null ? {} : { error: JSON.parse(row.error_json) })
   }
-  if (row.error_json !== null) childSpan.error = JSON.parse(row.error_json)
-  return childSpan
+  if (row.kind === 'db') {
+    return {
+      ...base,
+      kind: 'db',
+      system: row.db_system ?? '',
+      statement: row.db_statement ?? '',
+      operation: row.db_operation ?? '',
+      target: row.db_target,
+      rowCount: row.db_row_count
+    }
+  }
+  return {
+    ...base,
+    kind: 'fetch',
+    url: row.url ?? '',
+    method: row.method ?? '',
+    statusCode: row.status_code
+  }
 }
 
 function isHealthy(db: Database.Database): boolean {
@@ -165,8 +188,8 @@ export class SqliteSpanStore implements SpanStore {
     )
     const insertChild = this.db.prepare(
       `INSERT OR REPLACE INTO child_spans
-       (id, parent_span_id, trace_id, kind, url, method, status_code, start_time, ttfb, duration, error_json)
-       VALUES (@id, @parentSpanId, @traceId, @kind, @url, @method, @statusCode, @start, @ttfb, @duration, @errorJson)`
+       (id, parent_span_id, trace_id, kind, url, method, status_code, start_time, ttfb, duration, error_json, db_system, db_statement, db_operation, db_target, db_row_count)
+       VALUES (@id, @parentSpanId, @traceId, @kind, @url, @method, @statusCode, @start, @ttfb, @duration, @errorJson, @dbSystem, @dbStatement, @dbOperation, @dbTarget, @dbRowCount)`
     )
     const dropOldest = this.db.prepare(
       `DELETE FROM spans WHERE rowid IN (SELECT rowid FROM spans ORDER BY rowid ASC LIMIT ?) RETURNING id`
@@ -201,13 +224,18 @@ export class SqliteSpanStore implements SpanStore {
           parentSpanId: childSpan.parentSpanId,
           traceId: childSpan.traceId,
           kind: childSpan.kind,
-          url: childSpan.url,
-          method: childSpan.method,
-          statusCode: childSpan.statusCode,
+          url: childSpan.kind === 'fetch' ? childSpan.url : null,
+          method: childSpan.kind === 'fetch' ? childSpan.method : null,
+          statusCode: childSpan.kind === 'fetch' ? childSpan.statusCode : null,
           start: childSpan.timing.start,
           ttfb: childSpan.timing.ttfb,
           duration: childSpan.timing.duration,
-          errorJson: childSpan.error === undefined ? null : JSON.stringify(childSpan.error)
+          errorJson: childSpan.error === undefined ? null : JSON.stringify(childSpan.error),
+          dbSystem: childSpan.kind === 'db' ? childSpan.system : null,
+          dbStatement: childSpan.kind === 'db' ? childSpan.statement : null,
+          dbOperation: childSpan.kind === 'db' ? childSpan.operation : null,
+          dbTarget: childSpan.kind === 'db' ? childSpan.target : null,
+          dbRowCount: childSpan.kind === 'db' ? childSpan.rowCount : null
         })
       }
       const total = (countSpans.get() as { total: number }).total

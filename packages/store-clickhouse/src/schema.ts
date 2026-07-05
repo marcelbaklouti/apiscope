@@ -31,13 +31,18 @@ export function schemaStatements(database: string, retentionDays: number | null)
       parent_span_id String,
       trace_id String,
       kind String,
-      url String,
-      method String,
+      url Nullable(String),
+      method Nullable(String),
       status_code Nullable(UInt16),
       start_time Float64,
       ttfb Nullable(Float64),
       duration Float64,
       error_json Nullable(String),
+      db_system Nullable(String),
+      db_statement Nullable(String),
+      db_operation Nullable(String),
+      db_target Nullable(String),
+      db_row_count Nullable(Int64),
       inserted_at DateTime DEFAULT now()
     ) ENGINE = MergeTree
     PARTITION BY toDate(fromUnixTimestamp64Milli(toInt64(start_time)))

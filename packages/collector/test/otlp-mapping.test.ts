@@ -62,6 +62,28 @@ describe('otlp mapping', () => {
     expect(back.spans[0]?.loadRunId).toBe('eeeeeeeeeeeeeeee')
   })
 
+  it('maps db child spans to otlp client spans with db attributes', () => {
+    const dbChild = {
+      id: 'dddddddddddddddd',
+      parentSpanId: 'aaaaaaaaaaaaaaaa',
+      traceId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      kind: 'db' as const,
+      system: 'postgresql',
+      statement: 'SELECT * FROM users WHERE id = $1',
+      operation: 'SELECT',
+      target: 'appdb',
+      rowCount: 1,
+      timing: { start: 1_700_000_000_001, ttfb: null, duration: 2 }
+    }
+    const request = spansToExportRequest([parent], [dbChild], { serviceName: 'demo' })
+    const client = request.resourceSpans[0]!.scopeSpans[0]!.spans.find((span) => span.kind === 3)!
+    expect(client.attributes.find((a) => a.key === 'db.system.name')?.value.stringValue).toBe('postgresql')
+    expect(client.attributes.find((a) => a.key === 'db.operation.name')?.value.stringValue).toBe('SELECT')
+    const back = exportRequestToSpans(request)
+    const importedChild = back.childSpans[0]!
+    expect(importedChild.kind).toBe('db')
+  })
+
   it('accepts legacy attribute keys on import', () => {
     const request = spansToExportRequest([parent], [], { serviceName: 'demo' })
     const server = request.resourceSpans[0]!.scopeSpans[0]!.spans[0]!

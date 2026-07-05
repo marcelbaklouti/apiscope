@@ -51,6 +51,7 @@ describe('subscribeUndici', () => {
     })
     await vi.waitFor(() => expect(childSpans).toHaveLength(1))
     const childSpan = childSpans[0]!
+    if (childSpan.kind !== 'fetch') throw new Error('expected a fetch child span')
     expect(childSpan.parentSpanId).toBe(context.spanId)
     expect(childSpan.traceId).toBe(context.traceId)
     expect(childSpan.method).toBe('GET')
@@ -80,8 +81,10 @@ describe('subscribeUndici', () => {
       await expect(fetch('http://127.0.0.1:65530/unreachable')).rejects.toThrow()
     })
     await vi.waitFor(() => expect(childSpans).toHaveLength(1))
-    expect(childSpans[0]?.statusCode).toBeNull()
-    expect(childSpans[0]?.error?.message).toBeTruthy()
+    const errorChild = childSpans[0]!
+    if (errorChild.kind !== 'fetch') throw new Error('expected a fetch child span')
+    expect(errorChild.statusCode).toBeNull()
+    expect(errorChild.error?.message).toBeTruthy()
     unsubscribe()
     await runtime.shutdown()
   })

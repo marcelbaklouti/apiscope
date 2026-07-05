@@ -93,20 +93,46 @@ export function validateRequestSpan(value: unknown): ValidationIssue[] {
   return issues
 }
 
+function validateFetchChildSpan(value: Record<string, unknown>): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  requireString(issues, value, 'url', '')
+  requireString(issues, value, 'method', '')
+  if (value['statusCode'] !== null && (typeof value['statusCode'] !== 'number' || Number.isNaN(value['statusCode']))) {
+    issues.push({ path: 'statusCode', expected: 'number | null' })
+  }
+  return issues
+}
+
+function validateDbChildSpan(value: Record<string, unknown>): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  requireString(issues, value, 'system', '')
+  requireString(issues, value, 'statement', '')
+  requireString(issues, value, 'operation', '')
+  if (value['target'] !== null && typeof value['target'] !== 'string') {
+    issues.push({ path: 'target', expected: 'string | null' })
+  }
+  if (value['rowCount'] !== null && (typeof value['rowCount'] !== 'number' || Number.isNaN(value['rowCount']))) {
+    issues.push({ path: 'rowCount', expected: 'number | null' })
+  }
+  return issues
+}
+
 export function validateChildSpan(value: unknown): ValidationIssue[] {
   if (!isRecord(value)) return [{ path: '', expected: 'object' }]
   const issues: ValidationIssue[] = []
   requireString(issues, value, 'id', '')
   requireString(issues, value, 'parentSpanId', '')
   requireString(issues, value, 'traceId', '')
-  if (value['kind'] !== 'fetch') issues.push({ path: 'kind', expected: 'fetch' })
-  requireString(issues, value, 'url', '')
-  requireString(issues, value, 'method', '')
-  if (value['statusCode'] !== null && (typeof value['statusCode'] !== 'number' || Number.isNaN(value['statusCode']))) {
-    issues.push({ path: 'statusCode', expected: 'number | null' })
-  }
   issues.push(...validateTiming(value['timing'], 'timing'))
   issues.push(...validateError(value['error'], 'error'))
+  const kind = value['kind']
+  if (kind === 'fetch') {
+    issues.push(...validateFetchChildSpan(value))
+  } else if (kind === 'db') {
+    issues.push(...validateDbChildSpan(value))
+  } else {
+    issues.push({ path: 'kind', expected: 'fetch | db' })
+  }
   return issues
 }
 
