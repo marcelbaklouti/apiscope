@@ -49,10 +49,14 @@ export function sendJson(response: ServerResponse, statusCode: number, body: unk
   response.end(payload)
 }
 
-export async function readBody(request: IncomingMessage): Promise<string> {
+export async function readRawBody(request: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = []
   for await (const chunk of request) chunks.push(chunk as Buffer)
-  return Buffer.concat(chunks).toString('utf8')
+  return Buffer.concat(chunks)
+}
+
+export async function readBody(request: IncomingMessage): Promise<string> {
+  return (await readRawBody(request)).toString('utf8')
 }
 
 export function createRequestListener(routes: Map<string, RouteHandler>, dynamicHandlers: DynamicHandler[] = []): RequestListener {

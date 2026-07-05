@@ -47,10 +47,15 @@ export class IngestProcessor {
       this.hub.publish({ type: 'registry', appName, routes: message.routes })
       return { ok: true, appName }
     }
+    await this.ingestSpans(appName, message.spans, message.childSpans, message.droppedCount)
+    return { ok: true, appName }
+  }
+
+  async ingestSpans(appName: string, spans: RequestSpan[], childSpans: ChildSpan[], upstreamDroppedCount = 0): Promise<void> {
     const keptSpans: RequestSpan[] = []
     const keptIds = new Set<string>()
     let droppedBySampler = 0
-    for (const span of message.spans) {
+    for (const span of spans) {
       if (this.sampler.keep(span)) {
         keptSpans.push(span)
         keptIds.add(span.id)
@@ -58,7 +63,7 @@ export class IngestProcessor {
         droppedBySampler += 1
       }
     }
-    const keptChildSpans: ChildSpan[] = message.childSpans.filter((child) => keptIds.has(child.parentSpanId))
+    const keptChildSpans: ChildSpan[] = childSpans.filter((child) => keptIds.has(child.parentSpanId))
     const insertStart = process.hrtime.bigint()
     await this.store.insertBatch(appName, { spans: keptSpans, childSpans: keptChildSpans })
     const insertSeconds = Number(process.hrtime.bigint() - insertStart) / 1e9
@@ -67,13 +72,12 @@ export class IngestProcessor {
     }
     this.metrics.observeInsertSeconds(insertSeconds)
     this.metrics.recordIngestedSpans(appName, keptSpans.length)
-    const totalDropped = message.droppedCount + droppedBySampler
+    const totalDropped = upstreamDroppedCount + droppedBySampler
     this.metrics.recordDroppedSpans(appName, totalDropped)
     for (const span of keptSpans) this.metrics.recordRequest(appName, span.statusCode)
     if (keptSpans.length > 0 || keptChildSpans.length > 0) {
       this.hub.publish({ type: 'spans', appName, spans: keptSpans, childSpans: keptChildSpans })
     }
     if (totalDropped > 0) this.hub.publish({ type: 'dropped', appName, droppedCount: totalDropped })
-    return { ok: true, appName }
   }
 }

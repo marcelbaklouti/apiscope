@@ -7,6 +7,7 @@ import type { LiveTransport } from './live/live-transport'
 import { startLoadRun, type LoadRunRequest } from './load-runs'
 import { createMetrics } from './metrics'
 import { createOtlpExporter } from './otlp/exporter'
+import { createOtlpHttpHandler } from './otlp/receiver-http'
 import { createKeepAllSampler } from './sampling/sampler'
 import { createStaticHandler } from './static'
 import { SqliteSpanStore } from './store'
@@ -83,6 +84,7 @@ function isGuardExemptRoute(route: string, dashboardAuth: DashboardAuthenticator
 }
 
 function requiresDashboardIdentity(pathname: string): boolean {
+  if (pathname === '/v1/traces') return false
   return pathname.startsWith('/api/') || !pathname.startsWith('/auth/')
 }
 
@@ -202,9 +204,18 @@ export function createCollector(options: CollectorOptions): Collector {
     })
     return true
   }
+  const otlpHttpHandler: DynamicHandler | null =
+    options.otlpIngest?.http === true
+      ? createOtlpHttpHandler({
+          appName: options.otlpIngest.appName ?? 'otlp',
+          ingestAuth,
+          ingest: (appName, spans, childSpans) => processor.ingestSpans(appName, spans, childSpans)
+        })
+      : null
   const dynamicHandlers: DynamicHandler[] = [
     spanDetailHandler,
     loadRunDetailHandler,
+    ...(otlpHttpHandler === null ? [] : [otlpHttpHandler]),
     ...(options.dashboardDir === undefined ? [] : [createStaticHandler(options.dashboardDir)])
   ]
   const guardedRoutes = new Map<string, RouteHandler>()
