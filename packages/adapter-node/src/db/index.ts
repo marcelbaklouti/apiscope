@@ -3,6 +3,7 @@ import { instrumentBetterSqlite3 } from './better-sqlite3'
 import { instrumentMongodb } from './mongodb'
 import { instrumentMysql2, instrumentMysql2Promise } from './mysql2'
 import { instrumentPg } from './pg'
+import { enablePrismaBridge } from './prisma'
 import { registerActiveRuntime } from './registry'
 import type { AdapterRuntime } from '../runtime'
 
@@ -15,6 +16,13 @@ function tryInstrument(moduleName: string, instrument: (candidate: unknown) => v
   } catch {}
 }
 
+function tryEnablePrismaBridge(): void {
+  try {
+    require('@prisma/instrumentation')
+    enablePrismaBridge()
+  } catch {}
+}
+
 export function instrumentDatabases(runtime?: AdapterRuntime): void {
   if (runtime !== undefined) registerActiveRuntime(runtime)
   tryInstrument('pg', instrumentPg)
@@ -22,4 +30,5 @@ export function instrumentDatabases(runtime?: AdapterRuntime): void {
   tryInstrument('mysql2/promise', instrumentMysql2Promise)
   tryInstrument('better-sqlite3', instrumentBetterSqlite3)
   tryInstrument('mongodb', instrumentMongodb)
+  tryEnablePrismaBridge()
 }
