@@ -26,4 +26,11 @@ describe('parseCliArgs', () => {
     expect(parseCliArgs(['nonsense'])).toEqual({ command: 'help' })
     expect(parseCliArgs(['--help'])).toEqual({ command: 'help' })
   })
+
+  it('parses serve with a config path', () => {
+    expect(parseCliArgs(['serve', '--config', './apiscope.config.ts'])).toEqual({
+      command: 'serve',
+      configPath: './apiscope.config.ts'
+    })
+  })
 })

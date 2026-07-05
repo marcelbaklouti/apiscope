@@ -5,12 +5,15 @@ import { parseArgs } from 'node:util'
 import {
   createCollector,
   createDashboardAuthenticator,
+  createKeepAllSampler,
   createNoneIngestAuthenticator,
+  createTailSampler,
   createTokenIngestAuthenticator,
   createValkeyLiveTransport,
   resolveStore,
   type DashboardAuthenticator,
-  type LiveTransport
+  type LiveTransport,
+  type Sampler
 } from '@apiscope/collector'
 import { runCi } from './ci'
 import { ConfigError, loadConfig, type ApiscopeConfig, type ProductionConfig } from './config'
@@ -18,6 +21,7 @@ import { resolveSecret } from './secrets'
 
 export type CliInvocation =
   | { command: 'dev'; configPath: string | null }
+  | { command: 'serve'; configPath: string | null }
   | { command: 'ci'; configPath: string | null; updateBaseline: boolean; jsonPath?: string; junitPath?: string }
   | { command: 'help' }
 
@@ -37,6 +41,7 @@ export function parseCliArgs(argv: string[]): CliInvocation {
   const command = positionals[0] ?? 'dev'
   const configPath = values.config ?? null
   if (command === 'dev') return { command: 'dev', configPath }
+  if (command === 'serve') return { command: 'serve', configPath }
   if (command === 'ci') {
     return {
       command: 'ci',
@@ -53,6 +58,7 @@ const helpText = `apiscope
 
 usage:
   apiscope [dev] [--config path]        start collector and dashboard
+  apiscope serve [--config path]        start the production collector
   apiscope ci [--config path]           run scenarios, budgets and diffs
     --update-baseline                   write a new baseline instead of checking
     --json path                         write a json report
@@ -97,7 +103,21 @@ async function resolveLiveTransport(production: ProductionConfig | undefined): P
   })
 }
 
-async function runDev(configPath: string | null): Promise<void> {
+function resolveSampler(production: ProductionConfig | undefined): Sampler | undefined {
+  const sampling = production?.sampling
+  if (sampling === undefined || sampling.mode === 'keep-all') return undefined
+  return createTailSampler({
+    baseProbability: sampling.baseProbability ?? 0,
+    ...(sampling.outlierQuantile === undefined ? {} : { outlierQuantile: sampling.outlierQuantile })
+  })
+}
+
+interface StartCollectorServerOptions {
+  defaultHost: string
+  announce: 'dev' | 'prod'
+}
+
+async function startCollectorServer(configPath: string | null, options: StartCollectorServerOptions): Promise<void> {
   const cwd = process.cwd()
   const config = await resolveConfig(configPath, cwd)
   const dbPath = config.collector?.dbPath ?? join(cwd, '.apiscope', 'apiscope.db')
@@ -119,6 +139,7 @@ async function runDev(configPath: string | null): Promise<void> {
       : createTokenIngestAuthenticator(ingestAuthConfig.tokens.map((entry) => ({ appName: entry.appName, token: resolveSecret(entry.token) })))
   const dashboardAuth = await resolveDashboardAuth(production)
   const hub = await resolveLiveTransport(production)
+  const sampler = resolveSampler(production) ?? createKeepAllSampler()
   const tlsConfig = production?.tls
   const tls =
     tlsConfig === undefined
@@ -131,7 +152,7 @@ async function runDev(configPath: string | null): Promise<void> {
         }
   const collector = createCollector({
     dbPath,
-    ...(config.collector?.host === undefined ? {} : { host: config.collector.host }),
+    host: config.collector?.host ?? options.defaultHost,
     port: config.collector?.port ?? 4620,
     ...(config.collector?.retentionRows === undefined ? {} : { retentionRows: config.collector.retentionRows }),
     ...(dashboardDir === undefined ? {} : { dashboardDir }),
@@ -139,6 +160,7 @@ async function runDev(configPath: string | null): Promise<void> {
     ingestAuth,
     ...(dashboardAuth === undefined ? {} : { dashboardAuth }),
     ...(hub === undefined ? {} : { hub }),
+    sampler,
     ...(tls === undefined ? {} : { tls }),
     ...(production?.allowInsecure === undefined ? {} : { allowInsecure: production.allowInsecure }),
     meta: config
@@ -147,14 +169,26 @@ async function runDev(configPath: string | null): Promise<void> {
   if (collector.store.recoveredFromCorruption) {
     console.log('warning: previous database was corrupt and has been rotated away')
   }
-  console.log(`apiscope collector listening on ws://${address.host}:${address.port}`)
-  console.log(`dashboard: http://${address.host}:${address.port}`)
+  if (options.announce === 'dev') {
+    console.log(`apiscope collector listening on ws://${address.host}:${address.port}`)
+    console.log(`dashboard: http://${address.host}:${address.port}`)
+  } else {
+    console.log(`apiscope collector serving on ${address.host}:${address.port}`)
+  }
   const stop = async () => {
     await collector.close()
     process.exit(0)
   }
   process.on('SIGINT', () => void stop())
   process.on('SIGTERM', () => void stop())
+}
+
+async function runDev(configPath: string | null): Promise<void> {
+  await startCollectorServer(configPath, { defaultHost: '127.0.0.1', announce: 'dev' })
+}
+
+async function runServe(configPath: string | null): Promise<void> {
+  await startCollectorServer(configPath, { defaultHost: '0.0.0.0', announce: 'prod' })
 }
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
@@ -166,6 +200,10 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   try {
     if (invocation.command === 'dev') {
       await runDev(invocation.configPath)
+      return
+    }
+    if (invocation.command === 'serve') {
+      await runServe(invocation.configPath)
       return
     }
     const cwd = process.cwd()

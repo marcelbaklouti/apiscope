@@ -93,6 +93,13 @@ const productionSchema = z
         z.object({ mode: z.literal('memory') }),
         z.object({ mode: z.literal('valkey'), url: z.string(), channel: z.string().optional() })
       ])
+      .optional(),
+    sampling: z
+      .object({
+        mode: z.enum(['keep-all', 'tail']),
+        baseProbability: z.number().min(0).max(1).optional(),
+        outlierQuantile: z.number().optional()
+      })
       .optional()
   })
   .optional()
@@ -140,12 +147,15 @@ export type DashboardAuthProductionConfig =
 
 export type LiveTransportConfig = { mode: 'memory' } | { mode: 'valkey'; url: string; channel?: string }
 
+export type SamplingConfig = { mode: 'keep-all' | 'tail'; baseProbability?: number; outlierQuantile?: number }
+
 export interface ProductionConfig {
   ingestAuth?: IngestAuthConfig
   dashboardAuth?: DashboardAuthProductionConfig
   tls?: { key: string; cert: string; ca?: string; requestCert?: boolean }
   allowInsecure?: boolean
   liveTransport?: LiveTransportConfig
+  sampling?: SamplingConfig
 }
 
 export interface ApiscopeConfig {
