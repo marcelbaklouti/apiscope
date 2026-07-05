@@ -5,5 +5,6 @@ export default defineConfig({
   format: ['esm', 'cjs'],
   dts: { entry: 'src/index.ts' },
   banner: { js: '#!/usr/bin/env node' },
-  clean: true
+  clean: true,
+  shims: true
 })
