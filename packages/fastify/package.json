@@ -1,0 +1,38 @@
+{
+  "name": "@apiscope/fastify",
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@apiscope/adapter-node": "workspace:*",
+    "@apiscope/core": "workspace:*",
+    "fastify-plugin": "^6.0.0"
+  },
+  "peerDependencies": {
+    "fastify": ">=5.0.0"
+  },
+  "devDependencies": {
+    "@apiscope/collector": "workspace:*",
+    "@types/node": "^26.1.0",
+    "fastify": "^5.9.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9"
+  }
+}
