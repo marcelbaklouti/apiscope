@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "apiscope.fullname" . }}-config
+  labels:
+    {{- include "apiscope.labels" . | nindent 4 }}
+data:
+  apiscope.config.ts: |
+    import { defineConfig } from '@apiscope/cli'
+
+    export default defineConfig({
+      collector: {
+        host: '0.0.0.0',
+        port: {{ .Values.service.port }},
+        storage: {
+          driver: 'clickhouse',
+          url: {{ printf "%s" .Values.clickhouse.url | quote }},
+          username: 'env:APISCOPE_CLICKHOUSE_USER',
+          password: 'env:APISCOPE_CLICKHOUSE_PASSWORD',
+          database: {{ .Values.clickhouse.database | quote }},
+          retentionDays: {{ .Values.clickhouse.retentionDays }}
+        }
+      },
+      production: {
+        ingestAuth: {
+          mode: 'token',
+          tokens: [
+            {{- range $app, $token := .Values.secrets.ingestTokens }}
+            { appName: {{ $app | quote }}, token: {{ printf "env:APISCOPE_INGEST_TOKEN_%s" ($app | upper) | quote }} },
+            {{- end }}
+          ]
+        },
+        dashboardAuth: {
+          mode: 'password',
+          sessionSecret: 'env:APISCOPE_SESSION_SECRET',
+          users: [{ username: 'env:APISCOPE_DASHBOARD_USER', passwordHash: 'env:APISCOPE_DASHBOARD_PASSWORD_HASH', displayName: 'admin' }]
+        },
+        liveTransport: { mode: 'valkey', url: {{ printf "%s" .Values.valkey.url | quote }} },
+        sampling: { mode: 'tail', baseProbability: 0.1 }
+      }
+    })

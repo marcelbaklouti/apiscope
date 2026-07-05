@@ -1,0 +1,48 @@
+image:
+  repository: apiscope/collector
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+service:
+  type: ClusterIP
+  port: 4620
+
+ingress:
+  enabled: false
+  className: ""
+  host: apiscope.example.com
+  tls:
+    enabled: false
+    secretName: apiscope-tls
+
+clickhouse:
+  url: http://clickhouse:8123
+  database: apiscope
+  retentionDays: 30
+
+valkey:
+  url: valkey://valkey:6379
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+secrets:
+  clickhouseUser: apiscope
+  clickhousePassword: ""
+  sessionSecret: ""
+  dashboardUser: admin
+  dashboardPasswordHash: ""
+  ingestTokens: {}

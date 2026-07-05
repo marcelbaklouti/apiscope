@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "apiscope.fullname" . }}
+  labels:
+    {{- include "apiscope.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "apiscope.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "apiscope.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: collector
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["/app/packages/cli/dist/cli.js", "serve", "--config", "/etc/apiscope/apiscope.config.ts"]
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          envFrom:
+            - secretRef:
+                name: {{ include "apiscope.fullname" . }}
+          env:
+            - name: APISCOPE_CLICKHOUSE_URL
+              value: {{ .Values.clickhouse.url | quote }}
+            - name: APISCOPE_VALKEY_URL
+              value: {{ .Values.valkey.url | quote }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/apiscope
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "apiscope.fullname" . }}-config
