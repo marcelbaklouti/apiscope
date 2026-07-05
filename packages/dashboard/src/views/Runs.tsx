@@ -63,7 +63,7 @@ export function Runs({ runId }: { runId: string | null }) {
           <thead>
             <tr>
               <th>name</th>
-              <th>started</th>
+              <th className="num">started</th>
             </tr>
           </thead>
           <tbody>
@@ -134,9 +134,9 @@ export function Runs({ runId }: { runId: string | null }) {
                 <thead>
                   <tr>
                     <th></th>
-                    <th>{detail.name}</th>
-                    <th>{compare.name}</th>
-                    <th>delta</th>
+                    <th className="num">{detail.name}</th>
+                    <th className="num">{compare.name}</th>
+                    <th className="num">delta</th>
                   </tr>
                 </thead>
                 <tbody>

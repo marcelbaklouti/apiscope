@@ -92,7 +92,7 @@ function DashboardShell() {
           {droppedTotal} events dropped by adapters, numbers may be incomplete
         </div>
       )}
-      <LatencyStrip />
+      <LatencyStrip theme={theme} />
       <main>
         {view === 'overview' && <Overview />}
         {view === 'routes' && <Routes />}

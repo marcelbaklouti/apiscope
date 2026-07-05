@@ -30,11 +30,11 @@ export function Routes() {
           <th>pattern</th>
           <th>app</th>
           <th>source</th>
-          <th>count</th>
-          <th>errors</th>
-          <th>p50</th>
-          <th>p95</th>
-          <th>p99</th>
+          <th className="num">count</th>
+          <th className="num">errors</th>
+          <th className="num">p50</th>
+          <th className="num">p95</th>
+          <th className="num">p99</th>
           <th>trend</th>
         </tr>
       </thead>

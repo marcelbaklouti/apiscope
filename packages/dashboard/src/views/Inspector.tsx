@@ -131,8 +131,8 @@ export function Inspector({ spanId }: { spanId: string | null }) {
             <tr>
               <th>method</th>
               <th>path</th>
-              <th>status</th>
-              <th>duration</th>
+              <th className="num">status</th>
+              <th className="num">duration</th>
             </tr>
           </thead>
           <tbody>

@@ -7,7 +7,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--text-xs);
 }
 
 .mono,
@@ -17,22 +17,55 @@ table td.num,
   font-variant-numeric: tabular-nums;
 }
 
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: var(--text-lg);
+}
+
+h3 {
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+p {
+  margin: 0 0 var(--space-2);
+}
+
 a {
   color: var(--text);
 }
 
 button {
   font: inherit;
+  font-size: var(--text-xs);
   background: var(--bg-raised);
   color: var(--text);
   border: 1px solid var(--border);
-  padding: 4px 10px;
+  border-radius: 3px;
+  padding: var(--space-1) var(--space-3);
   cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--text-dim);
+}
+
+button:active {
+  transform: translateY(0.5px);
 }
 
 button:focus-visible,
 a:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -42,31 +75,88 @@ button.primary {
   color: var(--accent);
 }
 
+label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
 input,
 select,
 textarea {
   font: inherit;
+  font-size: var(--text-xs);
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
-  padding: 4px 8px;
+  border-radius: 3px;
+  padding: var(--space-1) var(--space-2);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  font-size: var(--text-xs);
 }
 
-th,
+th {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+th.num,
+td.num {
+  text-align: right;
+}
+
 td {
   text-align: left;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-hairline);
 }
 
-tr[data-selected='true'] {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+tbody tr {
+  cursor: default;
+}
+
+tbody tr[onclick],
+tbody tr.clickable {
+  cursor: pointer;
+}
+
+tbody tr:hover td {
+  background: var(--bg-raised);
+}
+
+tr[data-selected='true'] td {
+  background: var(--bg-raised);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.card table {
+  margin: 0 calc(var(--space-3) * -1);
+  width: calc(100% + var(--space-3) * 2);
+}
+
+.card table th:first-child,
+.card table td:first-child {
+  padding-left: var(--space-3);
+}
+
+.card table th:last-child,
+.card table td:last-child {
+  padding-right: var(--space-3);
+}
+
+.card table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .layout {
@@ -78,36 +168,45 @@ tr[data-selected='true'] {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 16px;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border);
+  min-height: 40px;
+}
+
+.topbar strong {
+  font-size: var(--text-sm);
+  letter-spacing: -0.01em;
 }
 
 .topbar nav {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .topbar nav a {
   text-decoration: none;
   color: var(--text-dim);
-  padding: 2px 4px;
+  padding: var(--space-1) 0;
+  font-size: var(--text-xs);
+  border-bottom: 2px solid transparent;
 }
 
 .topbar nav a[data-active='true'] {
   color: var(--text);
-  border-bottom: 2px solid var(--accent);
+  border-bottom-color: var(--accent);
 }
 
 main {
   overflow: auto;
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .banner {
-  padding: 6px 16px;
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border);
   background: var(--bg-raised);
+  font-size: var(--text-xs);
 }
 
 .banner[data-kind='error'] {
@@ -120,20 +219,35 @@ main {
 
 .empty {
   color: var(--text-dim);
-  padding: 48px;
+  padding: var(--space-12);
   text-align: center;
+  font-size: var(--text-xs);
 }
 
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .card {
   border: 1px solid var(--border);
+  border-radius: 4px;
   background: var(--bg-raised);
-  padding: 12px;
+  padding: var(--space-3);
+}
+
+.card + .card {
+  margin-top: var(--space-4);
+}
+
+.card h2 {
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  margin-bottom: var(--space-3);
 }
 
 .palette {
@@ -150,18 +264,28 @@ main {
   height: fit-content;
   background: var(--bg-raised);
   border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
 }
 
 .palette input {
   width: 100%;
   border: none;
   border-bottom: 1px solid var(--border);
-  padding: 10px;
+  padding: var(--space-3);
+  font-size: var(--text-sm);
 }
 
 .palette li {
   list-style: none;
-  padding: 8px 10px;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.palette li:last-child {
+  border-bottom: none;
 }
 
 .palette li[data-selected='true'] {
@@ -178,7 +302,8 @@ main {
 
 @media (prefers-reduced-motion: no-preference) {
   a,
-  button {
-    transition: color 120ms, border-color 120ms;
+  button,
+  tr {
+    transition: color 120ms, border-color 120ms, background-color 120ms;
   }
 }

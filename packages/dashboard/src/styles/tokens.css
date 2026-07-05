@@ -2,26 +2,42 @@
   --bg: #0a0a0b;
   --bg-raised: #121214;
   --border: #26262a;
+  --border-hairline: #1a1a1d;
   --text: #e8e6e3;
   --text-dim: #8f8d89;
   --accent: #ff5c00;
   --status-2xx: #8ba88e;
   --status-3xx: #7c8b9e;
   --status-4xx: #d9a621;
-  --status-5xx: #d64545;
+  --status-5xx: #dc5252;
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --text-2xs: 11px;
+  --text-xs: 13px;
+  --text-sm: 15px;
+  --text-lg: 20px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
 }
 
 [data-theme='light'] {
   --bg: #f6f5f3;
   --bg-raised: #ffffff;
   --border: #d8d6d2;
+  --border-hairline: #e7e5e1;
   --text: #191919;
   --text-dim: #5c5a56;
   --accent: #d84e00;
   --status-2xx: #4a7a4f;
   --status-3xx: #4a6484;
-  --status-4xx: #9a7200;
+  --status-4xx: #8f6a00;
   --status-5xx: #b32d2d;
 }
