@@ -21,9 +21,6 @@ importers:
         specifier: ^8.21.0
         version: 8.21.0
     devDependencies:
-      '@apiscope/collector':
-        specifier: workspace:*
-        version: link:../collector
       '@types/node':
         specifier: ^26.1.0
         version: 26.1.0
@@ -107,6 +104,9 @@ importers:
         specifier: ^8.21.0
         version: 8.21.0
     devDependencies:
+      '@apiscope/adapter-node':
+        specifier: workspace:*
+        version: link:../adapter-node
       '@testcontainers/valkey':
         specifier: ^12.0.4
         version: 12.0.4

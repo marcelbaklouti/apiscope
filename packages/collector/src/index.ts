@@ -5,6 +5,7 @@ import { IngestProcessor } from './ingest'
 import { InProcessLiveTransport } from './live-hub'
 import type { LiveTransport } from './live/live-transport'
 import { startLoadRun, type LoadRunRequest } from './load-runs'
+import { createMetrics } from './metrics'
 import { createKeepAllSampler } from './sampling/sampler'
 import { createStaticHandler } from './static'
 import { SqliteSpanStore } from './store'
@@ -29,6 +30,8 @@ export { createDashboardAuthenticator } from './auth/dashboard-auth'
 export type { DashboardAuthenticator, DashboardIdentity, DashboardAuthConfig } from './auth/dashboard-auth'
 export { createKeepAllSampler, createTailSampler } from './sampling/sampler'
 export type { Sampler, TailSamplerOptions } from './sampling/sampler'
+export { createMetrics } from './metrics'
+export type { CollectorMetrics } from './metrics'
 
 export interface Collector {
   listen(): Promise<{ host: string; port: number }>
@@ -71,7 +74,7 @@ function isLoopbackHost(host: string): boolean {
   return host === '127.0.0.1' || host === 'localhost' || host === '::1'
 }
 
-const guardExemptRoutes = new Set(['GET /health', 'POST /ingest', 'GET /api/session'])
+const guardExemptRoutes = new Set(['GET /health', 'GET /metrics', 'POST /ingest', 'GET /api/session'])
 
 function isGuardExemptRoute(route: string, dashboardAuth: DashboardAuthenticator): boolean {
   if (guardExemptRoutes.has(route)) return true
@@ -126,7 +129,8 @@ export function createCollector(options: CollectorOptions): Collector {
   const store = options.store ?? new SqliteSpanStore(options.dbPath, storeOptions)
   const hub = options.hub ?? new InProcessLiveTransport()
   const sampler = options.sampler ?? createKeepAllSampler()
-  const processor = new IngestProcessor(store, hub, sampler)
+  const metrics = createMetrics()
+  const processor = new IngestProcessor(store, hub, sampler, metrics)
   const ingestAuth = options.ingestAuth ?? createNoneIngestAuthenticator()
   const dashboardAuth = options.dashboardAuth ?? createInlineNoneDashboardAuthenticator()
   if (dashboardAuth.mode === 'none' && !isLoopbackHost(host) && options.allowInsecure !== true) {
@@ -134,6 +138,10 @@ export function createCollector(options: CollectorOptions): Collector {
   }
   const routes = new Map<string, RouteHandler>()
   routes.set('GET /health', (request, response) => sendJson(response, 200, { status: 'ok' }))
+  routes.set('GET /metrics', async (request, response) => {
+    response.writeHead(200, { 'content-type': 'text/plain; version=0.0.4' })
+    response.end(await metrics.render())
+  })
   routes.set('GET /api/session', async (request, response) => {
     const identity = await dashboardAuth.authenticate(request)
     sendJson(response, 200, identity === null ? { authenticated: false } : { authenticated: true, identity })
@@ -203,7 +211,7 @@ export function createCollector(options: CollectorOptions): Collector {
   }
   const guardedDynamicHandlers = dynamicHandlers.map((handler) => wrapDynamicWithDashboardGuard(handler, dashboardAuth))
   const server: Server = createHttpServer(guardedRoutes, guardedDynamicHandlers, options.tls)
-  attachWebSockets(server, processor, hub, ingestAuth)
+  attachWebSockets(server, processor, hub, ingestAuth, metrics)
   return {
     store,
     hub,

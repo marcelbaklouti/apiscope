@@ -30,7 +30,6 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
-    "@apiscope/collector": "workspace:*",
     "@types/node": "^26.1.0",
     "@types/ws": "^8.18.1",
     "tsup": "^8.5.1",

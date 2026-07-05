@@ -3,15 +3,18 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/ingest-auth'
 import { IngestProcessor, type IngestSession } from './ingest'
 import type { LiveTransport } from './live/live-transport'
+import type { CollectorMetrics } from './metrics'
 
 export function attachWebSockets(
   server: Server,
   processor: IngestProcessor,
   hub: LiveTransport,
-  ingestAuth: IngestAuthenticator = createNoneIngestAuthenticator()
+  ingestAuth: IngestAuthenticator = createNoneIngestAuthenticator(),
+  metrics?: CollectorMetrics
 ): void {
   const ingestServer = new WebSocketServer({ noServer: true })
   const liveServer = new WebSocketServer({ noServer: true })
+  let liveSubscriberCount = 0
 
   ingestServer.on('connection', (socket: WebSocket, request) => {
     const authenticatedApp = (request as { apiscopeAuthenticatedApp?: string | null }).apiscopeAuthenticatedApp ?? null
@@ -28,10 +31,16 @@ export function attachWebSockets(
   })
 
   liveServer.on('connection', (socket: WebSocket) => {
+    liveSubscriberCount += 1
+    metrics?.setLiveSubscribers(liveSubscriberCount)
     const unsubscribe = hub.subscribe((event) => {
       if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(event))
     })
-    socket.on('close', unsubscribe)
+    socket.on('close', () => {
+      unsubscribe()
+      liveSubscriberCount -= 1
+      metrics?.setLiveSubscribers(liveSubscriberCount)
+    })
   })
 
   server.on('upgrade', (request, socket, head) => {

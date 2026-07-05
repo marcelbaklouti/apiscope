@@ -1,5 +1,6 @@
 import { decodeWireMessage, type DecodeError, type RequestSpan } from '@apiscope/core'
 import type { LiveTransport } from './live/live-transport'
+import type { CollectorMetrics } from './metrics'
 import type { Sampler } from './sampling/sampler'
 import type { SpanStore } from './store-interface'
 
@@ -14,7 +15,8 @@ export class IngestProcessor {
   constructor(
     private readonly store: SpanStore,
     private readonly hub: LiveTransport,
-    private readonly sampler: Sampler
+    private readonly sampler: Sampler,
+    private readonly metrics: CollectorMetrics
   ) {}
 
   async process(raw: string, session: IngestSession): Promise<IngestResult> {
@@ -55,11 +57,17 @@ export class IngestProcessor {
       }
     }
     const keptChildSpans = message.childSpans.filter((child) => keptIds.has(child.parentSpanId))
+    const insertStart = process.hrtime.bigint()
     await this.store.insertBatch(appName, { spans: keptSpans, childSpans: keptChildSpans })
+    const insertSeconds = Number(process.hrtime.bigint() - insertStart) / 1e9
+    this.metrics.observeInsertSeconds(insertSeconds)
+    this.metrics.recordIngestedSpans(appName, keptSpans.length)
+    const totalDropped = message.droppedCount + droppedBySampler
+    this.metrics.recordDroppedSpans(appName, totalDropped)
+    for (const span of keptSpans) this.metrics.recordRequest(appName, span.statusCode)
     if (keptSpans.length > 0 || keptChildSpans.length > 0) {
       this.hub.publish({ type: 'spans', appName, spans: keptSpans, childSpans: keptChildSpans })
     }
-    const totalDropped = message.droppedCount + droppedBySampler
     if (totalDropped > 0) this.hub.publish({ type: 'dropped', appName, droppedCount: totalDropped })
     return { ok: true, appName }
   }
