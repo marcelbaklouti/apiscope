@@ -1,3 +1,4 @@
-export const PROTOCOL_VERSION = 1
+export * from './constants'
 export * from './types'
 export * from './validate'
+export * from './protocol'
