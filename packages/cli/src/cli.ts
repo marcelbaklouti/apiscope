@@ -13,7 +13,9 @@ import {
   resolveStore,
   type DashboardAuthenticator,
   type LiveTransport,
-  type Sampler
+  type Sampler,
+  type SpanStore,
+  type StorageConfig
 } from '@apiscope/collector'
 import { runCi } from './ci'
 import { ConfigError, loadConfig, type ApiscopeConfig, type ProductionConfig } from './config'
@@ -72,6 +74,19 @@ async function resolveConfig(configPath: string | null, cwd: string): Promise<Ap
   return loadConfig(effectivePath)
 }
 
+async function resolveStorage(storage: StorageConfig | undefined): Promise<SpanStore | undefined> {
+  if (storage === undefined) return undefined
+  if (storage.driver === 'sqlite') return resolveStore(storage)
+  return resolveStore({
+    driver: 'clickhouse',
+    url: resolveSecret(storage.url),
+    ...(storage.username === undefined ? {} : { username: resolveSecret(storage.username) }),
+    ...(storage.password === undefined ? {} : { password: resolveSecret(storage.password) }),
+    ...(storage.database === undefined ? {} : { database: storage.database }),
+    ...(storage.retentionDays === undefined ? {} : { retentionDays: storage.retentionDays })
+  })
+}
+
 async function resolveDashboardAuth(production: ProductionConfig | undefined): Promise<DashboardAuthenticator | undefined> {
   const dashboardAuth = production?.dashboardAuth
   if (dashboardAuth === undefined) return undefined
@@ -81,7 +96,11 @@ async function resolveDashboardAuth(production: ProductionConfig | undefined): P
     return createDashboardAuthenticator({
       mode: 'password',
       sessionSecret: resolveSecret(dashboardAuth.sessionSecret),
-      users: dashboardAuth.users
+      users: dashboardAuth.users.map((user) => ({
+        username: resolveSecret(user.username),
+        passwordHash: resolveSecret(user.passwordHash),
+        ...(user.displayName === undefined ? {} : { displayName: user.displayName })
+      }))
     })
   }
   return createDashboardAuthenticator({
@@ -129,7 +148,7 @@ async function startCollectorServer(configPath: string | null, options: StartCol
     console.log('dashboard package not found; api only')
   }
   const storage = config.collector?.storage
-  const store = storage === undefined ? undefined : await resolveStore(storage)
+  const store = await resolveStorage(storage)
   if (storage === undefined) mkdirSync(dirname(dbPath), { recursive: true })
   const production = config.production
   const ingestAuthConfig = production?.ingestAuth

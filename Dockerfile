@@ -6,6 +6,7 @@ COPY packages ./packages
 RUN pnpm install --frozen-lockfile
 RUN pnpm build
 RUN pnpm --filter "@apiscope/cli" deploy --prod --legacy /app/pruned
+RUN ln -s ../../packages/cli /app/pruned/node_modules/@apiscope/cli
 
 FROM gcr.io/distroless/nodejs24-debian12 AS runtime
 WORKDIR /app

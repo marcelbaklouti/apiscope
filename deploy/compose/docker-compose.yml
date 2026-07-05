@@ -1,0 +1,49 @@
+name: apiscope
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey:8
+    command: ["valkey-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  collector:
+    image: apiscope/collector:latest
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    environment:
+      APISCOPE_CLICKHOUSE_URL: http://clickhouse:8123
+      APISCOPE_CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      APISCOPE_CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      APISCOPE_VALKEY_URL: valkey://valkey:6379
+      APISCOPE_SESSION_SECRET: ${APISCOPE_SESSION_SECRET}
+      APISCOPE_DASHBOARD_USER: ${APISCOPE_DASHBOARD_USER}
+      APISCOPE_DASHBOARD_PASSWORD_HASH: ${APISCOPE_DASHBOARD_PASSWORD_HASH}
+      APISCOPE_INGEST_TOKEN_WEB: ${APISCOPE_INGEST_TOKEN_WEB}
+    volumes:
+      - ./apiscope.config.ts:/app/apiscope.config.ts:ro
+    command: ["/app/packages/cli/dist/cli.js", "serve", "--config", "/app/apiscope.config.ts"]
+    ports:
+      - "4620:4620"
+
+volumes:
+  clickhouse-data:
