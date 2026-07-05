@@ -3,19 +3,19 @@ import { ValkeyContainer, type StartedValkeyContainer } from '@testcontainers/va
 import { createValkeyLiveTransport } from '../src/live/valkey-transport'
 import type { LiveTransport } from '../src/live/live-transport'
 
-let container: StartedValkeyContainer
-let url = ''
+describe.skipIf(process.env.APISCOPE_SKIP_CONTAINERS === 'true')('valkey live transport', () => {
+  let container: StartedValkeyContainer
+  let url = ''
 
-beforeAll(async () => {
-  container = await new ValkeyContainer('valkey/valkey:8').start()
-  url = container.getConnectionUrl()
-}, 120000)
+  beforeAll(async () => {
+    container = await new ValkeyContainer('valkey/valkey:8').start()
+    url = container.getConnectionUrl()
+  }, 120000)
 
-afterAll(async () => {
-  await container.stop()
-})
+  afterAll(async () => {
+    await container.stop()
+  })
 
-describe('valkey live transport', () => {
   it('delivers events published on one instance to subscribers on another', async () => {
     const publisher: LiveTransport = await createValkeyLiveTransport({ url, channel: 'apiscope:test' })
     const subscriber: LiveTransport = await createValkeyLiveTransport({ url, channel: 'apiscope:test' })

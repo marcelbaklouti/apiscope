@@ -3,29 +3,31 @@ import { ClickHouseContainer, type StartedClickHouseContainer } from '@testconta
 import { runStoreConformance } from '@apiscope/collector/testing'
 import { ClickHouseSpanStore } from '../src/store'
 
-let container: StartedClickHouseContainer
-let baseUrl = ''
+describe.skipIf(process.env.APISCOPE_SKIP_CONTAINERS === 'true')('clickhouse store', () => {
+  let container: StartedClickHouseContainer
+  let baseUrl = ''
 
-beforeAll(async () => {
-  container = await new ClickHouseContainer('clickhouse/clickhouse-server:24.8').start()
-  baseUrl = container.getHttpUrl()
-}, 120000)
+  beforeAll(async () => {
+    container = await new ClickHouseContainer('clickhouse/clickhouse-server:24.8').start()
+    baseUrl = container.getHttpUrl()
+  }, 120000)
 
-afterAll(async () => {
-  await container.stop()
+  afterAll(async () => {
+    await container.stop()
+  })
+
+  runStoreConformance(
+    async () =>
+      new ClickHouseSpanStore({
+        url: baseUrl,
+        username: container.getUsername(),
+        password: container.getPassword(),
+        database: `apiscope_${Math.random().toString(36).slice(2)}`,
+        syncInserts: true,
+        retentionDays: null
+      }),
+    describe,
+    it,
+    expect as never
+  )
 })
-
-runStoreConformance(
-  async () =>
-    new ClickHouseSpanStore({
-      url: baseUrl,
-      username: container.getUsername(),
-      password: container.getPassword(),
-      database: `apiscope_${Math.random().toString(36).slice(2)}`,
-      syncInserts: true,
-      retentionDays: null
-    }),
-  describe,
-  it,
-  expect as never
-)

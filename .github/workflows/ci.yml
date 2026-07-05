@@ -15,6 +15,8 @@ jobs:
     strategy:
       matrix:
         node-version: [24, 26]
+    env:
+      APISCOPE_SKIP_CONTAINERS: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -53,3 +55,17 @@ jobs:
       - run: pnpm build
       - run: pnpm --filter @apiscope/dashboard exec playwright install --with-deps chromium
       - run: pnpm --filter @apiscope/dashboard test
+
+  docker-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm --filter @apiscope/store-clickhouse test
+      - run: pnpm --filter @apiscope/collector test -- valkey-transport
