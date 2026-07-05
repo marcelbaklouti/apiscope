@@ -2,9 +2,17 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { createCollector, resolveStore } from '@apiscope/collector'
+import {
+  createCollector,
+  createDashboardAuthenticator,
+  createNoneIngestAuthenticator,
+  createTokenIngestAuthenticator,
+  resolveStore,
+  type DashboardAuthenticator
+} from '@apiscope/collector'
 import { runCi } from './ci'
-import { ConfigError, loadConfig, type ApiscopeConfig } from './config'
+import { ConfigError, loadConfig, type ApiscopeConfig, type ProductionConfig } from './config'
+import { resolveSecret } from './secrets'
 
 export type CliInvocation =
   | { command: 'dev'; configPath: string | null }
@@ -56,6 +64,28 @@ async function resolveConfig(configPath: string | null, cwd: string): Promise<Ap
   return loadConfig(effectivePath)
 }
 
+async function resolveDashboardAuth(production: ProductionConfig | undefined): Promise<DashboardAuthenticator | undefined> {
+  const dashboardAuth = production?.dashboardAuth
+  if (dashboardAuth === undefined) return undefined
+  if (dashboardAuth.mode === 'none') return createDashboardAuthenticator({ mode: 'none' })
+  if (dashboardAuth.mode === 'proxy') return createDashboardAuthenticator(dashboardAuth)
+  if (dashboardAuth.mode === 'password') {
+    return createDashboardAuthenticator({
+      mode: 'password',
+      sessionSecret: resolveSecret(dashboardAuth.sessionSecret),
+      users: dashboardAuth.users
+    })
+  }
+  return createDashboardAuthenticator({
+    mode: 'oidc',
+    sessionSecret: resolveSecret(dashboardAuth.sessionSecret),
+    issuer: dashboardAuth.issuer,
+    clientId: dashboardAuth.clientId,
+    clientSecret: resolveSecret(dashboardAuth.clientSecret),
+    redirectUri: dashboardAuth.redirectUri
+  })
+}
+
 async function runDev(configPath: string | null): Promise<void> {
   const cwd = process.cwd()
   const config = await resolveConfig(configPath, cwd)
@@ -70,6 +100,23 @@ async function runDev(configPath: string | null): Promise<void> {
   const storage = config.collector?.storage
   const store = storage === undefined ? undefined : await resolveStore(storage)
   if (storage === undefined) mkdirSync(dirname(dbPath), { recursive: true })
+  const production = config.production
+  const ingestAuthConfig = production?.ingestAuth
+  const ingestAuth =
+    ingestAuthConfig === undefined || ingestAuthConfig.mode === 'none'
+      ? createNoneIngestAuthenticator()
+      : createTokenIngestAuthenticator(ingestAuthConfig.tokens.map((entry) => ({ appName: entry.appName, token: resolveSecret(entry.token) })))
+  const dashboardAuth = await resolveDashboardAuth(production)
+  const tlsConfig = production?.tls
+  const tls =
+    tlsConfig === undefined
+      ? undefined
+      : {
+          key: resolveSecret(tlsConfig.key),
+          cert: resolveSecret(tlsConfig.cert),
+          ...(tlsConfig.ca === undefined ? {} : { ca: resolveSecret(tlsConfig.ca) }),
+          ...(tlsConfig.requestCert === undefined ? {} : { requestCert: tlsConfig.requestCert })
+        }
   const collector = createCollector({
     dbPath,
     ...(config.collector?.host === undefined ? {} : { host: config.collector.host }),
@@ -77,6 +124,10 @@ async function runDev(configPath: string | null): Promise<void> {
     ...(config.collector?.retentionRows === undefined ? {} : { retentionRows: config.collector.retentionRows }),
     ...(dashboardDir === undefined ? {} : { dashboardDir }),
     ...(store === undefined ? {} : { store }),
+    ingestAuth,
+    ...(dashboardAuth === undefined ? {} : { dashboardAuth }),
+    ...(tls === undefined ? {} : { tls }),
+    ...(production?.allowInsecure === undefined ? {} : { allowInsecure: production.allowInsecure }),
     meta: config
   })
   const address = await collector.listen()

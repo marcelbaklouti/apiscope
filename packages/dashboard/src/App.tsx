@@ -10,6 +10,7 @@ import { Inspector } from './views/Inspector'
 import { LoadView } from './views/LoadView'
 import { Runs } from './views/Runs'
 import { ConfigView } from './views/ConfigView'
+import { Login } from './views/Login'
 
 function useTheme(): [string, () => void] {
   const [theme, setTheme] = useState(() => localStorage.getItem('apiscope-theme') ?? 'dark')
@@ -20,7 +21,43 @@ function useTheme(): [string, () => void] {
   return [theme, () => setTheme(theme === 'dark' ? 'light' : 'dark')]
 }
 
+interface SessionState {
+  loading: boolean
+  authenticated: boolean
+  requiresLoginRedirect: boolean
+}
+
+function useSession(): [SessionState, () => void] {
+  const [state, setState] = useState<SessionState>({ loading: true, authenticated: false, requiresLoginRedirect: false })
+  const [refetchToken, setRefetchToken] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const response = await fetch('/api/session')
+        const body = (await response.json()) as { authenticated: boolean; requiresLoginRedirect?: boolean }
+        if (!cancelled) {
+          setState({ loading: false, authenticated: body.authenticated, requiresLoginRedirect: body.requiresLoginRedirect ?? true })
+        }
+      } catch {
+        if (!cancelled) setState({ loading: false, authenticated: true, requiresLoginRedirect: false })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [refetchToken])
+  return [state, () => setRefetchToken((token) => token + 1)]
+}
+
 export function App() {
+  const [session, refetchSession] = useSession()
+  if (session.loading) return null
+  if (!session.authenticated && session.requiresLoginRedirect) return <Login onAuthenticated={refetchSession} />
+  return <DashboardShell />
+}
+
+function DashboardShell() {
   const { segments } = useHashRoute()
   const connected = useLiveConnection()
   const droppedTotal = useDashboardStore((state) => state.droppedTotal)

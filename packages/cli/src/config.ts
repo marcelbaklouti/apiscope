@@ -59,6 +59,38 @@ const storageSchema = z.discriminatedUnion('driver', [
   })
 ])
 
+const productionSchema = z
+  .object({
+    ingestAuth: z
+      .discriminatedUnion('mode', [
+        z.object({ mode: z.literal('none') }),
+        z.object({ mode: z.literal('token'), tokens: z.array(z.object({ appName: z.string(), token: z.string() })) })
+      ])
+      .optional(),
+    dashboardAuth: z
+      .discriminatedUnion('mode', [
+        z.object({ mode: z.literal('none') }),
+        z.object({
+          mode: z.literal('password'),
+          sessionSecret: z.string(),
+          users: z.array(z.object({ username: z.string(), passwordHash: z.string(), displayName: z.string().optional() }))
+        }),
+        z.object({
+          mode: z.literal('oidc'),
+          sessionSecret: z.string(),
+          issuer: z.string(),
+          clientId: z.string(),
+          clientSecret: z.string(),
+          redirectUri: z.string()
+        }),
+        z.object({ mode: z.literal('proxy'), userHeader: z.string(), nameHeader: z.string().optional() })
+      ])
+      .optional(),
+    tls: z.object({ key: z.string(), cert: z.string(), ca: z.string().optional(), requestCert: z.boolean().optional() }).optional(),
+    allowInsecure: z.boolean().optional()
+  })
+  .optional()
+
 const configSchema = z.object({
   collector: z
     .object({
@@ -88,8 +120,24 @@ const configSchema = z.object({
       failOnRouteDrift: z.boolean().optional(),
       scenarios: z.array(z.object({ scenario: scenarioSchema, assertions: assertionsSchema.optional() })).min(1)
     })
-    .optional()
+    .optional(),
+  production: productionSchema
 })
+
+export type IngestAuthConfig = { mode: 'none' } | { mode: 'token'; tokens: Array<{ appName: string; token: string }> }
+
+export type DashboardAuthProductionConfig =
+  | { mode: 'none' }
+  | { mode: 'password'; sessionSecret: string; users: Array<{ username: string; passwordHash: string; displayName?: string }> }
+  | { mode: 'oidc'; sessionSecret: string; issuer: string; clientId: string; clientSecret: string; redirectUri: string }
+  | { mode: 'proxy'; userHeader: string; nameHeader?: string }
+
+export interface ProductionConfig {
+  ingestAuth?: IngestAuthConfig
+  dashboardAuth?: DashboardAuthProductionConfig
+  tls?: { key: string; cert: string; ca?: string; requestCert?: boolean }
+  allowInsecure?: boolean
+}
 
 export interface ApiscopeConfig {
   collector?: { host?: string; port?: number; dbPath?: string; retentionRows?: number; storage?: StorageConfig }
@@ -100,6 +148,7 @@ export interface ApiscopeConfig {
     failOnRouteDrift?: boolean
     scenarios: Array<{ scenario: LoadScenario; assertions?: LoadAssertions }>
   }
+  production?: ProductionConfig
 }
 
 export class ConfigError extends Error {}
