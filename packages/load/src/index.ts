@@ -1,3 +1,4 @@
 export * from './types'
 export { assertAllowedTarget } from './safety'
 export { evaluateAssertions } from './assertions'
+export { RunAggregator } from './aggregator'
