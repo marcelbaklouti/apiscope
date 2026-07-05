@@ -1,6 +1,5 @@
 import { subscribe, unsubscribe } from 'node:diagnostics_channel'
-import { randomUUID } from 'node:crypto'
-import type { ChildSpan } from '@apiscope/core'
+import { newSpanId, type ChildSpan } from '@apiscope/core'
 import type { AdapterRuntime, SpanContext } from './runtime'
 
 interface UndiciRequest {
@@ -48,7 +47,7 @@ export function subscribeUndici(runtime: AdapterRuntime): () => void {
       if (context === null) return
       tracked.set(request, {
         context,
-        childSpanId: randomUUID(),
+        childSpanId: newSpanId(),
         url: `${String(request.origin)}${request.path}`,
         method: request.method,
         startedAt: Date.now(),

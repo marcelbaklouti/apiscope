@@ -2,6 +2,8 @@ import type { Context, Hono, MiddlewareHandler } from 'hono'
 import {
   SpanBuffer,
   buildCapturedPayload,
+  newSpanId,
+  newTraceId,
   type CapturedPayload,
   type RequestSpan,
   type RouteRegistryEntry,
@@ -26,10 +28,6 @@ export function detectRuntime(): Runtime {
   if (globals.Deno !== undefined) return 'deno'
   if (globals.navigator?.userAgent === 'Cloudflare-Workers') return 'edge'
   return 'node'
-}
-
-function generateId(): string {
-  return crypto.randomUUID()
 }
 
 function routesFromApp(app: Hono): RouteRegistryEntry[] {
@@ -106,8 +104,8 @@ export function apiscopeHono(app: Hono, options: HonoAdapterOptions): { shutdown
         const path = new URL(c.req.url).pathname
         const requestPayload = capturePayload(headersToRecord(c.req.raw.headers))
         const span: RequestSpan = {
-          id: generateId(),
-          traceId: generateId(),
+          id: newSpanId(),
+          traceId: newTraceId(),
           method: c.req.method,
           routePattern: c.req.routePath === '*' ? null : c.req.routePath,
           actualPath: path,

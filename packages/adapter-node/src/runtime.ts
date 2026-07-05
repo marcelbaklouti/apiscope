@@ -1,8 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { randomUUID } from 'node:crypto'
 import {
   SpanBuffer,
   buildCapturedPayload,
+  newSpanId,
+  newTraceId,
   type CapturedPayload,
   type ChildSpan,
   type RequestSpan,
@@ -60,7 +61,7 @@ export class AdapterRuntime {
   }
 
   newIds(): SpanContext {
-    return { traceId: randomUUID(), spanId: randomUUID() }
+    return { traceId: newTraceId(), spanId: newSpanId() }
   }
 
   runWithSpan<T>(context: SpanContext, fn: () => T): T {
