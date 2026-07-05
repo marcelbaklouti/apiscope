@@ -36,6 +36,19 @@ const spans = Array.from({ length: 40 }, (unused, index) => ({
   }
 }))
 
+const nPlusOneChildSpans = Array.from({ length: 6 }, (unused, index) => ({
+  id: `seed-child-db-${index}`,
+  parentSpanId: 'seed-4',
+  traceId: 'trace-4',
+  kind: 'db',
+  system: 'postgresql',
+  statement: `SELECT * FROM comments WHERE user_id = ${index}`,
+  operation: 'SELECT',
+  target: 'appdb',
+  rowCount: 1,
+  timing: { start: now + index, ttfb: null, duration: 3 }
+}))
+
 await collector.store.insertBatch('seed-app', {
   spans,
   childSpans: [
@@ -48,7 +61,20 @@ await collector.store.insertBatch('seed-app', {
       method: 'GET',
       statusCode: 200,
       timing: { start: now + 2, ttfb: 3, duration: 5 }
-    }
+    },
+    {
+      id: 'seed-child-db',
+      parentSpanId: 'seed-4',
+      traceId: 'trace-4',
+      kind: 'db',
+      system: 'postgresql',
+      statement: "SELECT * FROM users WHERE id = 4",
+      operation: 'SELECT',
+      target: 'appdb',
+      rowCount: 1,
+      timing: { start: now + 1, ttfb: null, duration: 2 }
+    },
+    ...nPlusOneChildSpans
   ]
 })
 

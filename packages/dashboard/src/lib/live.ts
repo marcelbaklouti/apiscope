@@ -49,7 +49,7 @@ export function useLiveConnection(): boolean {
           store.addSpans(event.spans, event.childSpans ?? [], event.appName ?? '')
         } else if (event.type === 'registry' && event.routes !== undefined && event.appName !== undefined) {
           const appName = event.appName
-          store.setRoutes(appName, event.routes.map((route): RouteEntry => ({ appName, ...route })))
+          store.setRoutes(appName, event.routes.map((route): RouteEntry => ({ appName, nPlusOneRequests: 0, ...route })))
         } else if (event.type === 'app-connected' && event.app !== undefined) {
           store.appConnected(event.app)
         } else if (event.type === 'app-disconnected' && event.appName !== undefined) {

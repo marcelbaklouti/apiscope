@@ -1,24 +1,22 @@
-import { createRequire } from 'node:module'
 import { instrumentBetterSqlite3 } from './better-sqlite3'
 import { instrumentMongodb } from './mongodb'
 import { instrumentMysql2, instrumentMysql2Promise } from './mysql2'
 import { instrumentPg } from './pg'
 import { enablePrismaBridge } from './prisma'
 import { registerActiveRuntime } from './registry'
+import { requireOptional } from './require-optional'
 import type { AdapterRuntime } from '../runtime'
-
-const require = createRequire(import.meta.url)
 
 function tryInstrument(moduleName: string, instrument: (candidate: unknown) => void): void {
   try {
-    const candidate: unknown = require(moduleName)
+    const candidate = requireOptional(moduleName)
     instrument(candidate)
   } catch {}
 }
 
 function tryEnablePrismaBridge(): void {
   try {
-    require('@prisma/instrumentation')
+    requireOptional('@prisma/instrumentation')
     enablePrismaBridge()
   } catch {}
 }

@@ -8,9 +8,11 @@ export function Routes() {
   const [stats, setStats] = useState<RouteStatsEntry[]>([])
   const routes = useDashboardStore((state) => state.routes)
   const spans = useDashboardStore((state) => state.spans)
+  const refreshRoutes = useDashboardStore((state) => state.refreshRoutes)
   useEffect(() => {
     void api.routeStats().then(setStats).catch(() => setStats([]))
-  }, [spans.length])
+    void api.routes().then(refreshRoutes).catch(() => {})
+  }, [spans.length, refreshRoutes])
   if (routes.length === 0 && stats.length === 0) {
     return <div className="empty">no routes registered yet</div>
   }
@@ -36,6 +38,7 @@ export function Routes() {
           <th className="num">p95</th>
           <th className="num">p99</th>
           <th>trend</th>
+          <th>n+1</th>
         </tr>
       </thead>
       <tbody>
@@ -54,6 +57,13 @@ export function Routes() {
               <td className="num">{routeStats === undefined ? '' : `${routeStats.p99.toFixed(1)}ms`}</td>
               <td>
                 <Sparkline values={durationsFor(route.method, route.pattern)} />
+              </td>
+              <td data-testid="n-plus-one-indicator">
+                {route.nPlusOneRequests > 0 && (
+                  <span className="num" style={{ color: 'var(--status-4xx)' }}>
+                    {route.nPlusOneRequests}
+                  </span>
+                )}
               </td>
             </tr>
           )

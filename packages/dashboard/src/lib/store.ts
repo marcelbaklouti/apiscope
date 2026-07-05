@@ -13,6 +13,7 @@ interface DashboardState {
   progressByRun: Record<string, { name: string; snapshot: LoadProgress; finished: boolean; ok: boolean | null }>
   addSpans(spans: Span[], childSpans: Child[], appName: string): void
   setRoutes(appName: string, routes: RouteEntry[]): void
+  refreshRoutes(routes: RouteEntry[]): void
   appConnected(app: AppMetadata): void
   appDisconnected(appName: string): void
   addDropped(count: number): void
@@ -38,9 +39,19 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       return { spans: [...spans, ...state.spans].slice(0, spanLimit), childSpansByParent: childMap }
     }),
   setRoutes: (appName, routes) =>
-    set((state) => ({
-      routes: [...state.routes.filter((route) => route.appName !== appName), ...routes]
-    })),
+    set((state) => {
+      const previousByKey = new Map(
+        state.routes
+          .filter((route) => route.appName === appName)
+          .map((route) => [`${route.method} ${route.pattern}`, route.nPlusOneRequests])
+      )
+      const merged = routes.map((route) => ({
+        ...route,
+        nPlusOneRequests: previousByKey.get(`${route.method} ${route.pattern}`) ?? route.nPlusOneRequests
+      }))
+      return { routes: [...state.routes.filter((route) => route.appName !== appName), ...merged] }
+    }),
+  refreshRoutes: (routes) => set({ routes }),
   appConnected: (app) =>
     set((state) => ({ apps: [...state.apps.filter((entry) => entry.name !== app.name), app] })),
   appDisconnected: (appName) => set((state) => ({ apps: state.apps.filter((entry) => entry.name !== appName) })),

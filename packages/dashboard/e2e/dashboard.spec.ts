@@ -34,6 +34,22 @@ test('routes view lists registry with stats', async ({ page }) => {
   await expect(page.getByText('app/api/users/[id]/route.ts')).toBeVisible()
 })
 
+test('inspector renders db child spans and an n+1 warning banner', async ({ page }) => {
+  await page.goto('/#/inspector/seed-4')
+  await expect(page.getByTestId('span-detail-title')).toContainText('GET /api/users/4')
+  await expect(page.getByTestId('n-plus-one-banner')).toBeVisible()
+  await expect(page.getByTestId('n-plus-one-banner')).toContainText('n+1: 6×')
+  const dbRows = page.getByTestId('waterfall-row-db')
+  await expect(dbRows).toHaveCount(7)
+  await expect(dbRows.first()).toContainText('postgresql')
+})
+
+test('routes view flags the n+1-prone route', async ({ page }) => {
+  await page.goto('/#/routes')
+  const usersRow = page.locator('tr', { has: page.getByText('/api/users/:id') })
+  await expect(usersRow.getByTestId('n-plus-one-indicator')).toContainText('1')
+})
+
 test('command palette opens and navigates', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByTestId('connection')).toBeVisible()

@@ -2,23 +2,33 @@ import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { useHashRoute } from '../lib/router'
 import { useDashboardStore } from '../lib/store'
-import type { Child, Span } from '../lib/types'
+import type { Child, NPlusOneGroup, Span, SpanDetail } from '../lib/types'
+
+function waterfallRowLabel(child: Child): string {
+  return child.kind === 'db' ? `${child.system} · ${child.statement}` : `${child.method} ${child.url}`
+}
 
 function Waterfall({ span, childSpans }: { span: Span; childSpans: Child[] }) {
   const total = Math.max(span.timing.duration, 1)
   const rows = [
-    { label: `${span.method} ${span.actualPath}`, start: 0, duration: span.timing.duration, root: true },
+    { label: `${span.method} ${span.actualPath}`, start: 0, duration: span.timing.duration, root: true, kind: 'root' as const, child: null as Child | null },
     ...childSpans.map((child) => ({
-      label: `${child.method} ${child.url}`,
+      label: waterfallRowLabel(child),
       start: Math.max(0, child.timing.start - span.timing.start),
       duration: child.timing.duration,
-      root: false
+      root: false,
+      kind: child.kind,
+      child
     }))
   ]
   return (
-    <div>
+    <div data-testid="waterfall">
       {rows.map((row, index) => (
-        <div key={index} style={{ display: 'grid', gridTemplateColumns: '260px 1fr 70px', gap: 8, alignItems: 'center' }}>
+        <div
+          key={index}
+          data-testid={row.kind === 'db' ? 'waterfall-row-db' : row.kind === 'fetch' ? 'waterfall-row-fetch' : 'waterfall-row-root'}
+          style={{ display: 'grid', gridTemplateColumns: '260px 1fr 70px 60px', gap: 8, alignItems: 'center' }}
+        >
           <span className="mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {row.label}
           </span>
@@ -30,11 +40,27 @@ function Waterfall({ span, childSpans }: { span: Span; childSpans: Child[] }) {
                 width: `${Math.max((row.duration / total) * 100, 0.5)}%`,
                 top: 2,
                 bottom: 2,
-                background: row.root ? 'var(--text-dim)' : 'var(--status-3xx)'
+                background: row.root ? 'var(--text-dim)' : row.kind === 'db' ? 'var(--accent)' : 'var(--status-3xx)'
               }}
             />
           </div>
           <span className="num">{row.duration.toFixed(1)}ms</span>
+          <span className="num" style={{ color: 'var(--text-dim)' }}>
+            {row.child?.kind === 'db' && row.child.rowCount !== null ? `${row.child.rowCount} rows` : ''}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function NPlusOneBanner({ groups }: { groups: NPlusOneGroup[] }) {
+  if (groups.length === 0) return null
+  return (
+    <div className="banner" data-kind="warn" data-testid="n-plus-one-banner">
+      {groups.map((group, index) => (
+        <div key={index} className="mono">
+          n+1: {group.count}× {group.system} · {group.template}
         </div>
       ))}
     </div>
@@ -76,7 +102,7 @@ function PayloadCard({ title, payload }: { title: string; payload: Span['request
 export function Inspector({ spanId, loadRunId = null }: { spanId: string | null; loadRunId?: string | null }) {
   const liveSpans = useDashboardStore((state) => state.spans)
   const { navigate } = useHashRoute()
-  const [detail, setDetail] = useState<{ span: Span; childSpans: Child[] } | null>(null)
+  const [detail, setDetail] = useState<SpanDetail | null>(null)
   const [methodFilter, setMethodFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [runSpans, setRunSpans] = useState<Span[] | null>(null)
@@ -200,6 +226,7 @@ export function Inspector({ spanId, loadRunId = null }: { spanId: string | null;
                 {detail.span.error.message}
               </div>
             )}
+            <NPlusOneBanner groups={detail.nPlusOne} />
             <Waterfall span={detail.span} childSpans={detail.childSpans} />
             <PayloadCard title="request" payload={detail.span.request} />
             <PayloadCard title="response" payload={detail.span.response} />

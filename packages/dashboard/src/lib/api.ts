@@ -1,4 +1,4 @@
-import type { Child, RouteEntry, RouteStatsEntry, RunDetail, RunSummary, Span } from './types'
+import type { RouteEntry, RouteStatsEntry, RunDetail, RunSummary, Span, SpanDetail } from './types'
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path)
@@ -10,7 +10,7 @@ export const api = {
   spans: (limit = 200) => getJson<Span[]>(`/api/spans?limit=${limit}`),
   spansByLoadRun: (loadRunId: string, limit = 200) =>
     getJson<Span[]>(`/api/spans?loadRunId=${encodeURIComponent(loadRunId)}&limit=${limit}`),
-  spanById: (id: string) => getJson<{ span: Span; childSpans: Child[] }>(`/api/spans/${encodeURIComponent(id)}`),
+  spanById: (id: string) => getJson<SpanDetail>(`/api/spans/${encodeURIComponent(id)}`),
   routes: () => getJson<RouteEntry[]>('/api/routes'),
   routeStats: () => getJson<RouteStatsEntry[]>('/api/route-stats'),
   runs: () => getJson<RunSummary[]>('/api/load-runs'),

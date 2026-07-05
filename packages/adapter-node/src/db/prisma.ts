@@ -1,9 +1,7 @@
-import { createRequire } from 'node:module'
 import { newSpanId, type DbChildSpan } from '@apiscope/core'
 import { sqlOperationOf } from './emit'
 import { getActiveRuntime } from './registry'
-
-const require = createRequire(import.meta.url)
+import { requireOptional } from './require-optional'
 
 interface OtelReadableSpan {
   attributes: Record<string, unknown>
@@ -72,13 +70,13 @@ let registeredProcessor: OtelSpanProcessor | null = null
 
 export function enablePrismaBridge(): void {
   if (registeredProcessor !== null) return
-  const { BasicTracerProvider } = require('@opentelemetry/sdk-trace-base') as {
+  const { BasicTracerProvider } = requireOptional('@opentelemetry/sdk-trace-base') as {
     BasicTracerProvider: new (config: { spanProcessors: OtelSpanProcessor[] }) => unknown
   }
-  const { registerInstrumentations } = require('@opentelemetry/instrumentation') as {
+  const { registerInstrumentations } = requireOptional('@opentelemetry/instrumentation') as {
     registerInstrumentations: (options: { instrumentations: unknown[]; tracerProvider: unknown }) => void
   }
-  const { PrismaInstrumentation } = require('@prisma/instrumentation') as {
+  const { PrismaInstrumentation } = requireOptional('@prisma/instrumentation') as {
     PrismaInstrumentation: new () => unknown
   }
   registeredProcessor = buildProcessor()

@@ -3,7 +3,20 @@ import type { LoadRunResult, LoadScenario } from '@apiscope/load'
 
 export type Span = RequestSpan
 export type Child = ChildSpan
-export type RouteEntry = { appName: string } & RouteRegistryEntry
+export type RouteEntry = { appName: string; nPlusOneRequests: number } & RouteRegistryEntry
+
+export interface NPlusOneGroup {
+  system: string
+  template: string
+  count: number
+  totalDurationMs: number
+}
+
+export interface SpanDetail {
+  span: Span
+  childSpans: Child[]
+  nPlusOne: NPlusOneGroup[]
+}
 
 export interface RouteStatsEntry {
   routePattern: string | null
