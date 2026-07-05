@@ -4,12 +4,19 @@ import {
   buildCapturedPayload,
   newSpanId,
   newTraceId,
+  parseTraceparent,
   type CapturedPayload,
   type ChildSpan,
   type RequestSpan,
   type RouteRegistryEntry
 } from '@apiscope/core'
 import { CollectorTransport } from './transport'
+
+function readHeader(headers: Record<string, string | string[] | undefined>, name: string): string | undefined {
+  const value = headers[name]
+  if (value === undefined) return undefined
+  return Array.isArray(value) ? value[0] : value
+}
 
 export interface SpanContext {
   traceId: string
@@ -62,6 +69,22 @@ export class AdapterRuntime {
 
   newIds(): SpanContext {
     return { traceId: newTraceId(), spanId: newSpanId() }
+  }
+
+  openSpanContext(headers: Record<string, string | string[] | undefined>): {
+    traceId: string
+    parentSpanId?: string
+    loadRunId?: string
+  } {
+    const traceparentHeader = readHeader(headers, 'traceparent')
+    const inbound = traceparentHeader === undefined ? null : parseTraceparent(traceparentHeader)
+    const loadRun = readHeader(headers, 'apiscope-load-run')
+    const result: { traceId: string; parentSpanId?: string; loadRunId?: string } = {
+      traceId: inbound === null ? newTraceId() : inbound.traceId
+    }
+    if (inbound !== null) result.parentSpanId = inbound.spanId
+    if (loadRun !== undefined) result.loadRunId = loadRun
+    return result
   }
 
   runWithSpan<T>(context: SpanContext, fn: () => T): T {

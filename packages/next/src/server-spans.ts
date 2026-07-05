@@ -1,10 +1,13 @@
 import { subscribe, unsubscribe } from 'node:diagnostics_channel'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { newSpanId } from '@apiscope/core'
 import type { AdapterRuntime, SpanContext } from '@apiscope/adapter-node'
 import { matchRoutePattern } from './scanner'
 
 interface PendingRequest {
   context: SpanContext
+  parentSpanId?: string
+  loadRunId?: string
   startedAtWall: number
   startedAtHighRes: number
 }
@@ -23,8 +26,15 @@ export function subscribeHttpServer(runtime: AdapterRuntime, getPatterns: () => 
       const { request } = message as { request: IncomingMessage }
       const path = (request.url ?? '/').split('?')[0] ?? '/'
       if (isInternalPath(path)) return
-      const context = runtime.newIds()
-      pending.set(request, { context, startedAtWall: Date.now(), startedAtHighRes: performance.now() })
+      const spanContext = runtime.openSpanContext(request.headers)
+      const context = { traceId: spanContext.traceId, spanId: newSpanId() }
+      pending.set(request, {
+        context,
+        startedAtWall: Date.now(),
+        startedAtHighRes: performance.now(),
+        ...(spanContext.parentSpanId === undefined ? {} : { parentSpanId: spanContext.parentSpanId }),
+        ...(spanContext.loadRunId === undefined ? {} : { loadRunId: spanContext.loadRunId })
+      })
       runtime.enterSpan(context)
     } catch {}
   }
@@ -56,6 +66,8 @@ export function subscribeHttpServer(runtime: AdapterRuntime, getPatterns: () => 
         },
         framework: 'next',
         runtime: 'node',
+        ...(entry.parentSpanId === undefined ? {} : { parentSpanId: entry.parentSpanId }),
+        ...(entry.loadRunId === undefined ? {} : { loadRunId: entry.loadRunId }),
         ...(requestPayload === undefined ? {} : { request: requestPayload })
       })
     } catch {}

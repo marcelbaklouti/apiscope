@@ -69,6 +69,22 @@ describe('apiscopeHono batch mode', () => {
       { timeout: 2000 }
     )
   })
+
+  it('adopts inbound trace context', async () => {
+    const app = await startStack('batch')
+    const traceparent = '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01'
+    const response = await app.request('http://localhost/todos/9', {
+      headers: { traceparent, 'apiscope-load-run': 'run-123' }
+    })
+    expect(response.status).toBe(200)
+    if (shutdown !== null) await shutdown()
+    shutdown = null
+    await vi.waitFor(async () => expect((await collector.store.recentSpans(10)).length).toBeGreaterThan(0))
+    const span = (await collector.store.recentSpans(10))[0]!
+    expect(span.traceId).toBe('0af7651916cd43dd8448eb211c80319c')
+    expect(span.parentSpanId).toBe('b7ad6b7169203331')
+    expect(span.loadRunId).toBe('run-123')
+  })
 })
 
 describe('apiscopeHono immediate mode', () => {

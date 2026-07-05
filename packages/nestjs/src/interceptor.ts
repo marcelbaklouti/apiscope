@@ -2,7 +2,7 @@ import { Inject, Injectable, type CallHandler, type ExecutionContext, type NestI
 import type { Observable } from 'rxjs'
 import { catchError } from 'rxjs/operators'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { SpanError } from '@apiscope/core'
+import { newSpanId, type SpanError } from '@apiscope/core'
 import { AdapterRuntime } from '@apiscope/adapter-node'
 import { joinRoutePaths } from './registry'
 
@@ -11,6 +11,8 @@ export const APISCOPE_RUNTIME = Symbol('APISCOPE_RUNTIME')
 interface PendingSpan {
   spanId: string
   traceId: string
+  parentSpanId?: string
+  loadRunId?: string
   startedAtWall: number
   startedAtHighRes: number
   routePattern: string | null
@@ -40,14 +42,17 @@ export class ApiscopeInterceptor implements NestInterceptor {
       const response = http.getResponse<ServerResponse>()
       const controllerPath = Reflect.getMetadata('path', context.getClass()) as string | undefined
       const handlerPath = Reflect.getMetadata('path', context.getHandler()) as string | undefined
-      const ids = this.runtime.newIds()
+      const spanContext = this.runtime.openSpanContext(request.headers)
+      const ids = { traceId: spanContext.traceId, spanId: newSpanId() }
       this.runtime.enterSpan(ids)
       const pending: PendingSpan = {
         spanId: ids.spanId,
         traceId: ids.traceId,
         startedAtWall: Date.now(),
         startedAtHighRes: performance.now(),
-        routePattern: joinRoutePaths(controllerPath, handlerPath)
+        routePattern: joinRoutePaths(controllerPath, handlerPath),
+        ...(spanContext.parentSpanId === undefined ? {} : { parentSpanId: spanContext.parentSpanId }),
+        ...(spanContext.loadRunId === undefined ? {} : { loadRunId: spanContext.loadRunId })
       }
       if (!this.instrumentedResponses.has(response)) {
         this.instrumentedResponses.add(response)
@@ -76,6 +81,8 @@ export class ApiscopeInterceptor implements NestInterceptor {
               },
               framework: 'nestjs',
               runtime: 'node',
+              ...(pending.parentSpanId === undefined ? {} : { parentSpanId: pending.parentSpanId }),
+              ...(pending.loadRunId === undefined ? {} : { loadRunId: pending.loadRunId }),
               ...(pending.error === undefined ? {} : { error: pending.error }),
               ...(requestPayload === undefined ? {} : { request: requestPayload }),
               ...(responsePayload === undefined ? {} : { response: responsePayload })

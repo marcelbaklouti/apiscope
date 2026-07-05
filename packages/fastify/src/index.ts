@@ -1,6 +1,6 @@
 import fastifyPlugin from 'fastify-plugin'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import type { RouteRegistryEntry, SpanError } from '@apiscope/core'
+import { newSpanId, type RouteRegistryEntry, type SpanError } from '@apiscope/core'
 import { AdapterRuntime, subscribeUndici, type AdapterRuntimeOptions, type SpanContext } from '@apiscope/adapter-node'
 
 export type FastifyAdapterOptions = Omit<AdapterRuntimeOptions, 'framework' | 'transport'> & {
@@ -9,6 +9,8 @@ export type FastifyAdapterOptions = Omit<AdapterRuntimeOptions, 'framework' | 't
 
 interface PendingSpan {
   context: SpanContext
+  parentSpanId?: string
+  loadRunId?: string
   startedAtWall: number
   error?: SpanError
 }
@@ -57,8 +59,14 @@ async function plugin(app: FastifyInstance, options: FastifyAdapterOptions): Pro
 
   app.addHook('onRequest', async (request) => {
     try {
-      const context = runtime.newIds()
-      pendingSpans.set(request, { context, startedAtWall: Date.now() })
+      const spanContext = runtime.openSpanContext(request.headers as Record<string, string | string[] | undefined>)
+      const context = { traceId: spanContext.traceId, spanId: newSpanId() }
+      pendingSpans.set(request, {
+        context,
+        startedAtWall: Date.now(),
+        ...(spanContext.parentSpanId === undefined ? {} : { parentSpanId: spanContext.parentSpanId }),
+        ...(spanContext.loadRunId === undefined ? {} : { loadRunId: spanContext.loadRunId })
+      })
       runtime.enterSpan(context)
     } catch {}
   })
@@ -94,6 +102,8 @@ async function plugin(app: FastifyInstance, options: FastifyAdapterOptions): Pro
         timing: { start: pending.startedAtWall, ttfb: null, duration: reply.elapsedTime },
         framework: 'fastify',
         runtime: 'node',
+        ...(pending.parentSpanId === undefined ? {} : { parentSpanId: pending.parentSpanId }),
+        ...(pending.loadRunId === undefined ? {} : { loadRunId: pending.loadRunId }),
         ...(pending.error === undefined ? {} : { error: pending.error }),
         ...(requestPayload === undefined ? {} : { request: requestPayload }),
         ...(responsePayload === undefined ? {} : { response: responsePayload })

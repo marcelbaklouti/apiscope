@@ -4,6 +4,7 @@ import {
   buildCapturedPayload,
   newSpanId,
   newTraceId,
+  parseTraceparent,
   type CapturedPayload,
   type RequestSpan,
   type RouteRegistryEntry,
@@ -49,6 +50,18 @@ function headersToRecord(headers: Headers): Record<string, string> {
     record[name] = value
   })
   return record
+}
+
+function openSpanContext(headers: Headers): { traceId: string; parentSpanId?: string; loadRunId?: string } {
+  const traceparentHeader = headers.get('traceparent')
+  const inbound = traceparentHeader === null ? null : parseTraceparent(traceparentHeader)
+  const loadRun = headers.get('apiscope-load-run')
+  const result: { traceId: string; parentSpanId?: string; loadRunId?: string } = {
+    traceId: inbound === null ? newTraceId() : inbound.traceId
+  }
+  if (inbound !== null) result.parentSpanId = inbound.spanId
+  if (loadRun !== null) result.loadRunId = loadRun
+  return result
 }
 
 function executionContextOf(c: Context): { waitUntil(promise: Promise<unknown>): void } | null {
@@ -103,9 +116,10 @@ export function apiscopeHono(app: Hono, options: HonoAdapterOptions): { shutdown
         }
         const path = new URL(c.req.url).pathname
         const requestPayload = capturePayload(headersToRecord(c.req.raw.headers))
+        const spanContext = openSpanContext(c.req.raw.headers)
         const span: RequestSpan = {
           id: newSpanId(),
-          traceId: newTraceId(),
+          traceId: spanContext.traceId,
           method: c.req.method,
           routePattern: c.req.routePath === '*' ? null : c.req.routePath,
           actualPath: path,
@@ -113,6 +127,8 @@ export function apiscopeHono(app: Hono, options: HonoAdapterOptions): { shutdown
           timing: { start: startedAtWall, ttfb: null, duration: performance.now() - startedAtHighRes },
           framework: 'hono',
           runtime,
+          ...(spanContext.parentSpanId === undefined ? {} : { parentSpanId: spanContext.parentSpanId }),
+          ...(spanContext.loadRunId === undefined ? {} : { loadRunId: spanContext.loadRunId }),
           ...(spanError === undefined ? {} : { error: spanError }),
           ...(requestPayload === undefined ? {} : { request: requestPayload })
         }

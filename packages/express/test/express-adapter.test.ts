@@ -87,4 +87,15 @@ describe('apiscopeExpress', () => {
       { timeout: 2000 }
     )
   })
+
+  it('adopts inbound trace context', async () => {
+    const { baseUrl } = await startStack()
+    const traceparent = '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01'
+    await fetch(`${baseUrl}/users/1`, { headers: { traceparent, 'apiscope-load-run': 'run-123' } })
+    await vi.waitFor(async () => expect((await collector.store.recentSpans(10)).length).toBeGreaterThan(0))
+    const span = (await collector.store.recentSpans(10))[0]!
+    expect(span.traceId).toBe('0af7651916cd43dd8448eb211c80319c')
+    expect(span.parentSpanId).toBe('b7ad6b7169203331')
+    expect(span.loadRunId).toBe('run-123')
+  })
 })

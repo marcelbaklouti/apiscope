@@ -1,5 +1,6 @@
 import type { Express, NextFunction, Request, RequestHandler, Response } from 'express'
 import { AdapterRuntime, subscribeUndici, type AdapterRuntimeOptions } from '@apiscope/adapter-node'
+import { newSpanId } from '@apiscope/core'
 import { extractExpressRoutes } from './routes'
 
 export { extractExpressRoutes } from './routes'
@@ -39,7 +40,8 @@ export function apiscopeExpress(options: ExpressAdapterOptions): RequestHandler 
         registryPushed = true
         runtime.setRoutes(extractExpressRoutes(request.app as Express))
       }
-      const context = runtime.newIds()
+      const spanContext = runtime.openSpanContext(request.headers)
+      const context = { traceId: spanContext.traceId, spanId: newSpanId() }
       const startedAtWall = Date.now()
       const startedAt = performance.now()
       let ttfb: number | null = null
@@ -83,6 +85,8 @@ export function apiscopeExpress(options: ExpressAdapterOptions): RequestHandler 
             timing: { start: startedAtWall, ttfb, duration: performance.now() - startedAt },
             framework: 'express',
             runtime: 'node',
+            ...(spanContext.parentSpanId === undefined ? {} : { parentSpanId: spanContext.parentSpanId }),
+            ...(spanContext.loadRunId === undefined ? {} : { loadRunId: spanContext.loadRunId }),
             ...(requestPayload === undefined ? {} : { request: requestPayload }),
             ...(responsePayload === undefined ? {} : { response: responsePayload })
           })
