@@ -1,4 +1,6 @@
-export function schemaStatements(database: string, retentionDays: number): string[] {
+export function schemaStatements(database: string, retentionDays: number | null): string[] {
+  const spansTtl = retentionDays === null ? '' : `\n    TTL toDate(fromUnixTimestamp64Milli(toInt64(start_time))) + INTERVAL ${retentionDays} DAY`
+  const childSpansTtl = retentionDays === null ? '' : `\n    TTL toDate(fromUnixTimestamp64Milli(toInt64(start_time))) + INTERVAL ${retentionDays} DAY`
   return [
     `CREATE DATABASE IF NOT EXISTS ${database}`,
     `CREATE TABLE IF NOT EXISTS ${database}.spans (
@@ -20,8 +22,8 @@ export function schemaStatements(database: string, retentionDays: number): strin
       inserted_at DateTime DEFAULT now()
     ) ENGINE = MergeTree
     PARTITION BY toDate(fromUnixTimestamp64Milli(toInt64(start_time)))
-    ORDER BY (app_name, route_pattern, method, start_time, id)
-    TTL toDate(fromUnixTimestamp64Milli(toInt64(start_time))) + INTERVAL ${retentionDays} DAY`,
+    ORDER BY (app_name, route_pattern, method, start_time, id)${spansTtl}
+    SETTINGS allow_nullable_key = 1`,
     `CREATE TABLE IF NOT EXISTS ${database}.child_spans (
       id String,
       parent_span_id String,
@@ -37,8 +39,7 @@ export function schemaStatements(database: string, retentionDays: number): strin
       inserted_at DateTime DEFAULT now()
     ) ENGINE = MergeTree
     PARTITION BY toDate(fromUnixTimestamp64Milli(toInt64(start_time)))
-    ORDER BY (parent_span_id, start_time, id)
-    TTL toDate(fromUnixTimestamp64Milli(toInt64(start_time))) + INTERVAL ${retentionDays} DAY`,
+    ORDER BY (parent_span_id, start_time, id)${childSpansTtl}`,
     `CREATE TABLE IF NOT EXISTS ${database}.routes (
       app_name String,
       method String,

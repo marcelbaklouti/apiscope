@@ -13,7 +13,7 @@ export interface ClickHouseStoreOptions {
   username?: string
   password?: string
   database?: string
-  retentionDays?: number
+  retentionDays?: number | null
   syncInserts?: boolean
 }
 
@@ -56,11 +56,11 @@ export class ClickHouseSpanStore implements SpanStore {
   readonly recoveredFromCorruption = false
   private readonly client: ClickHouseClient
   private readonly database: string
-  private readonly retentionDays: number
+  private readonly retentionDays: number | null
 
   constructor(options: ClickHouseStoreOptions) {
     this.database = options.database ?? 'apiscope'
-    this.retentionDays = options.retentionDays ?? 30
+    this.retentionDays = options.retentionDays === undefined ? 30 : options.retentionDays
     this.client = createClient({
       url: options.url,
       ...(options.username === undefined ? {} : { username: options.username }),
