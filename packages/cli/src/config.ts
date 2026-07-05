@@ -87,7 +87,13 @@ const productionSchema = z
       ])
       .optional(),
     tls: z.object({ key: z.string(), cert: z.string(), ca: z.string().optional(), requestCert: z.boolean().optional() }).optional(),
-    allowInsecure: z.boolean().optional()
+    allowInsecure: z.boolean().optional(),
+    liveTransport: z
+      .discriminatedUnion('mode', [
+        z.object({ mode: z.literal('memory') }),
+        z.object({ mode: z.literal('valkey'), url: z.string(), channel: z.string().optional() })
+      ])
+      .optional()
   })
   .optional()
 
@@ -132,11 +138,14 @@ export type DashboardAuthProductionConfig =
   | { mode: 'oidc'; sessionSecret: string; issuer: string; clientId: string; clientSecret: string; redirectUri: string }
   | { mode: 'proxy'; userHeader: string; nameHeader?: string }
 
+export type LiveTransportConfig = { mode: 'memory' } | { mode: 'valkey'; url: string; channel?: string }
+
 export interface ProductionConfig {
   ingestAuth?: IngestAuthConfig
   dashboardAuth?: DashboardAuthProductionConfig
   tls?: { key: string; cert: string; ca?: string; requestCert?: boolean }
   allowInsecure?: boolean
+  liveTransport?: LiveTransportConfig
 }
 
 export interface ApiscopeConfig {

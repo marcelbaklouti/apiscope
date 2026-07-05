@@ -7,8 +7,10 @@ import {
   createDashboardAuthenticator,
   createNoneIngestAuthenticator,
   createTokenIngestAuthenticator,
+  createValkeyLiveTransport,
   resolveStore,
-  type DashboardAuthenticator
+  type DashboardAuthenticator,
+  type LiveTransport
 } from '@apiscope/collector'
 import { runCi } from './ci'
 import { ConfigError, loadConfig, type ApiscopeConfig, type ProductionConfig } from './config'
@@ -86,6 +88,15 @@ async function resolveDashboardAuth(production: ProductionConfig | undefined): P
   })
 }
 
+async function resolveLiveTransport(production: ProductionConfig | undefined): Promise<LiveTransport | undefined> {
+  const liveTransport = production?.liveTransport
+  if (liveTransport === undefined || liveTransport.mode === 'memory') return undefined
+  return createValkeyLiveTransport({
+    url: resolveSecret(liveTransport.url),
+    ...(liveTransport.channel === undefined ? {} : { channel: liveTransport.channel })
+  })
+}
+
 async function runDev(configPath: string | null): Promise<void> {
   const cwd = process.cwd()
   const config = await resolveConfig(configPath, cwd)
@@ -107,6 +118,7 @@ async function runDev(configPath: string | null): Promise<void> {
       ? createNoneIngestAuthenticator()
       : createTokenIngestAuthenticator(ingestAuthConfig.tokens.map((entry) => ({ appName: entry.appName, token: resolveSecret(entry.token) })))
   const dashboardAuth = await resolveDashboardAuth(production)
+  const hub = await resolveLiveTransport(production)
   const tlsConfig = production?.tls
   const tls =
     tlsConfig === undefined
@@ -126,6 +138,7 @@ async function runDev(configPath: string | null): Promise<void> {
     ...(store === undefined ? {} : { store }),
     ingestAuth,
     ...(dashboardAuth === undefined ? {} : { dashboardAuth }),
+    ...(hub === undefined ? {} : { hub }),
     ...(tls === undefined ? {} : { tls }),
     ...(production?.allowInsecure === undefined ? {} : { allowInsecure: production.allowInsecure }),
     meta: config

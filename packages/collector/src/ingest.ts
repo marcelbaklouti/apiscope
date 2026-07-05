@@ -1,5 +1,5 @@
 import { decodeWireMessage, type DecodeError, type RequestSpan } from '@apiscope/core'
-import { LiveHub } from './live-hub'
+import type { LiveTransport } from './live/live-transport'
 import type { Sampler } from './sampling/sampler'
 import type { SpanStore } from './store-interface'
 
@@ -13,7 +13,7 @@ export type IngestResult = { ok: true; appName: string } | { ok: false; error: D
 export class IngestProcessor {
   constructor(
     private readonly store: SpanStore,
-    private readonly hub: LiveHub,
+    private readonly hub: LiveTransport,
     private readonly sampler: Sampler
   ) {}
 

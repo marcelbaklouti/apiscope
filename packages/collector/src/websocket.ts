@@ -2,12 +2,12 @@ import type { Server } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/ingest-auth'
 import { IngestProcessor, type IngestSession } from './ingest'
-import { LiveHub } from './live-hub'
+import type { LiveTransport } from './live/live-transport'
 
 export function attachWebSockets(
   server: Server,
   processor: IngestProcessor,
-  hub: LiveHub,
+  hub: LiveTransport,
   ingestAuth: IngestAuthenticator = createNoneIngestAuthenticator()
 ): void {
   const ingestServer = new WebSocketServer({ noServer: true })

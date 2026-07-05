@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { assertAllowedTarget, runLoadTest, type LoadAssertions, type LoadScenario } from '@apiscope/load'
-import { LiveHub } from './live-hub'
+import type { LiveTransport } from './live/live-transport'
 import type { SpanStore } from './store-interface'
 
 export interface LoadRunRequest {
@@ -8,7 +8,7 @@ export interface LoadRunRequest {
   assertions?: LoadAssertions
 }
 
-export function startLoadRun(request: LoadRunRequest, store: SpanStore, hub: LiveHub): { runId: string } {
+export function startLoadRun(request: LoadRunRequest, store: SpanStore, hub: LiveTransport): { runId: string } {
   assertAllowedTarget(request.scenario.baseUrl, request.scenario.allowRemoteHosts)
   const runId = randomUUID()
   const startedAt = Date.now()

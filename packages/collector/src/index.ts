@@ -2,7 +2,8 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { createDashboardAuthenticator, type DashboardAuthenticator } from './auth/dashboard-auth'
 import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/ingest-auth'
 import { IngestProcessor } from './ingest'
-import { LiveHub } from './live-hub'
+import { InProcessLiveTransport } from './live-hub'
+import type { LiveTransport } from './live/live-transport'
 import { startLoadRun, type LoadRunRequest } from './load-runs'
 import { createKeepAllSampler } from './sampling/sampler'
 import { createStaticHandler } from './static'
@@ -14,8 +15,10 @@ import { createHttpServer, readBody, sendJson, type CollectorOptions, type Dynam
 export type { CollectorOptions }
 export type { SpanStore, RouteStats, StoredLoadRun, StoredLoadRunSummary } from './store-interface'
 export { SqliteSpanStore } from './store'
-export { LiveHub } from './live-hub'
-export type { LiveEvent } from './live-hub'
+export { InProcessLiveTransport, LiveHub } from './live-hub'
+export type { LiveEvent } from './live-events'
+export type { LiveTransport } from './live/live-transport'
+export { createValkeyLiveTransport } from './live/valkey-transport'
 export { IngestProcessor } from './ingest'
 export { attachWebSockets } from './websocket'
 export { resolveStore } from './store-factory'
@@ -31,7 +34,7 @@ export interface Collector {
   listen(): Promise<{ host: string; port: number }>
   close(): Promise<void>
   store: SpanStore
-  hub: LiveHub
+  hub: LiveTransport
 }
 
 function handleIngest(processor: IngestProcessor, ingestAuth: IngestAuthenticator) {
@@ -121,7 +124,7 @@ export function createCollector(options: CollectorOptions): Collector {
   const port = options.port ?? 4620
   const storeOptions = options.retentionRows === undefined ? {} : { retentionRows: options.retentionRows }
   const store = options.store ?? new SqliteSpanStore(options.dbPath, storeOptions)
-  const hub = new LiveHub()
+  const hub = options.hub ?? new InProcessLiveTransport()
   const sampler = options.sampler ?? createKeepAllSampler()
   const processor = new IngestProcessor(store, hub, sampler)
   const ingestAuth = options.ingestAuth ?? createNoneIngestAuthenticator()

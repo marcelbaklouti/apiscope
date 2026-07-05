@@ -1,28 +1,21 @@
-import type { AppMetadata, ChildSpan, RequestSpan, RouteRegistryEntry } from '@apiscope/core'
+import type { LiveEvent } from './live-events'
+import type { LiveTransport } from './live/live-transport'
 
-export type LiveEvent =
-  | { type: 'spans'; appName: string; spans: RequestSpan[]; childSpans: ChildSpan[] }
-  | { type: 'registry'; appName: string; routes: RouteRegistryEntry[] }
-  | { type: 'app-connected'; app: AppMetadata }
-  | { type: 'app-disconnected'; appName: string }
-  | { type: 'dropped'; appName: string; droppedCount: number }
-  | {
-      type: 'load-progress'
-      runId: string
-      name: string
-      snapshot: { totalRequests: number; errorCount: number; latencyP95: number }
-    }
-  | { type: 'load-finished'; runId: string; ok: boolean }
-
-export class LiveHub {
+export class InProcessLiveTransport implements LiveTransport {
   private readonly listeners = new Set<(event: LiveEvent) => void>()
+
+  publish(event: LiveEvent): void {
+    for (const listener of this.listeners) listener(event)
+  }
 
   subscribe(listener: (event: LiveEvent) => void): () => void {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
   }
 
-  publish(event: LiveEvent): void {
-    for (const listener of this.listeners) listener(event)
+  async close(): Promise<void> {
+    this.listeners.clear()
   }
 }
+
+export { InProcessLiveTransport as LiveHub }
