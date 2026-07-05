@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { createCollector } from '@apiscope/collector'
+import { createCollector, resolveStore } from '@apiscope/collector'
 import { evaluateAssertions, runLoadTest, type LoadRunResult } from '@apiscope/load'
 import {
   baselineFromResults,
@@ -68,9 +68,11 @@ export async function runCi(options: CiOptions): Promise<CiRun> {
     log(message)
     return { exitCode: 2, reportText: message }
   }
+  const storage = options.config.collector?.storage
+  const store = storage === undefined ? undefined : await resolveStore(storage)
   const dbPath = join(options.cwd, '.apiscope', `ci-${process.pid}-${randomUUID()}.db`)
-  mkdirSync(dirname(dbPath), { recursive: true })
-  const collector = createCollector({ dbPath, port: 0 })
+  if (storage === undefined) mkdirSync(dirname(dbPath), { recursive: true })
+  const collector = createCollector({ dbPath, port: 0, ...(store === undefined ? {} : { store }) })
   const address = await collector.listen()
   log(`APISCOPE_COLLECTOR_URL=ws://${address.host}:${address.port}`)
   try {

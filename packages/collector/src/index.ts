@@ -15,6 +15,8 @@ export { LiveHub } from './live-hub'
 export type { LiveEvent } from './live-hub'
 export { IngestProcessor } from './ingest'
 export { attachWebSockets } from './websocket'
+export { resolveStore } from './store-factory'
+export type { StorageConfig } from './store-factory'
 
 export interface Collector {
   listen(): Promise<{ host: string; port: number }>
@@ -38,7 +40,7 @@ export function createCollector(options: CollectorOptions): Collector {
   const host = options.host ?? '127.0.0.1'
   const port = options.port ?? 4620
   const storeOptions = options.retentionRows === undefined ? {} : { retentionRows: options.retentionRows }
-  const store = new SqliteSpanStore(options.dbPath, storeOptions)
+  const store = options.store ?? new SqliteSpanStore(options.dbPath, storeOptions)
   const hub = new LiveHub()
   const processor = new IngestProcessor(store, hub)
   const routes = new Map<string, RouteHandler>()

@@ -1,5 +1,6 @@
 import { createJiti } from 'jiti'
 import { z } from 'zod'
+import type { StorageConfig } from '@apiscope/collector'
 import type { LoadAssertions, LoadScenario } from '@apiscope/load'
 
 const targetSchema = z.object({
@@ -42,13 +43,30 @@ const assertionsSchema = z.object({
   achievedRpsMin: z.number().positive().optional()
 })
 
+const storageSchema = z.discriminatedUnion('driver', [
+  z.object({
+    driver: z.literal('sqlite'),
+    dbPath: z.string(),
+    retentionRows: z.number().int().positive().optional()
+  }),
+  z.object({
+    driver: z.literal('clickhouse'),
+    url: z.string(),
+    username: z.string().optional(),
+    password: z.string().optional(),
+    database: z.string().optional(),
+    retentionDays: z.number().int().positive().optional()
+  })
+])
+
 const configSchema = z.object({
   collector: z
     .object({
       host: z.string().optional(),
       port: z.number().int().positive().optional(),
       dbPath: z.string().optional(),
-      retentionRows: z.number().int().positive().optional()
+      retentionRows: z.number().int().positive().optional(),
+      storage: storageSchema.optional()
     })
     .optional(),
   ci: z
@@ -74,7 +92,7 @@ const configSchema = z.object({
 })
 
 export interface ApiscopeConfig {
-  collector?: { host?: string; port?: number; dbPath?: string; retentionRows?: number }
+  collector?: { host?: string; port?: number; dbPath?: string; retentionRows?: number; storage?: StorageConfig }
   ci?: {
     readiness: { url: string; timeoutMs?: number; intervalMs?: number }
     baselinePath?: string

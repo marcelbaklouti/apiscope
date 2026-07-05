@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { createCollector } from '@apiscope/collector'
+import { createCollector, resolveStore } from '@apiscope/collector'
 import { runCi } from './ci'
 import { ConfigError, loadConfig, type ApiscopeConfig } from './config'
 
@@ -60,7 +60,6 @@ async function runDev(configPath: string | null): Promise<void> {
   const cwd = process.cwd()
   const config = await resolveConfig(configPath, cwd)
   const dbPath = config.collector?.dbPath ?? join(cwd, '.apiscope', 'apiscope.db')
-  mkdirSync(dirname(dbPath), { recursive: true })
   let dashboardDir: string | undefined
   try {
     const require = createRequire(import.meta.url)
@@ -68,12 +67,16 @@ async function runDev(configPath: string | null): Promise<void> {
   } catch {
     console.log('dashboard package not found; api only')
   }
+  const storage = config.collector?.storage
+  const store = storage === undefined ? undefined : await resolveStore(storage)
+  if (storage === undefined) mkdirSync(dirname(dbPath), { recursive: true })
   const collector = createCollector({
     dbPath,
     ...(config.collector?.host === undefined ? {} : { host: config.collector.host }),
     port: config.collector?.port ?? 4620,
     ...(config.collector?.retentionRows === undefined ? {} : { retentionRows: config.collector.retentionRows }),
     ...(dashboardDir === undefined ? {} : { dashboardDir }),
+    ...(store === undefined ? {} : { store }),
     meta: config
   })
   const address = await collector.listen()

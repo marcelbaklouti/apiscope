@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import type { SpanStore } from './store-interface'
 
 export interface CollectorOptions {
   dbPath: string
@@ -7,6 +8,7 @@ export interface CollectorOptions {
   retentionRows?: number
   dashboardDir?: string
   meta?: unknown
+  store?: SpanStore
 }
 
 export type RouteHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => void | Promise<void>
