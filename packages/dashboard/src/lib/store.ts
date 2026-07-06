@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { AppMetadata } from '@apiscope/core'
-import type { Child, LoadProgress, RouteEntry, Span } from './types'
+import type { Child, InsightsResponse, LoadProgress, RouteEntry, Span } from './types'
+
+type InsightsGrouping = 'severity' | 'category' | 'route'
 
 const spanLimit = 2000
 
@@ -11,6 +13,17 @@ interface DashboardState {
   apps: AppMetadata[]
   droppedTotal: number
   progressByRun: Record<string, { name: string; snapshot: LoadProgress; finished: boolean; ok: boolean | null }>
+  insights: InsightsResponse | null
+  insightsLoading: boolean
+  insightsError: string | null
+  insightsDismissed: string[]
+  insightsGrouping: InsightsGrouping
+  setInsights(response: InsightsResponse): void
+  setInsightsLoading(loading: boolean): void
+  setInsightsError(error: string | null): void
+  dismissFinding(ruleId: string, routePattern: string | undefined): void
+  restoreDismissed(): void
+  setInsightsGrouping(grouping: InsightsGrouping): void
   addSpans(spans: Span[], childSpans: Child[], appName: string): void
   setRoutes(appName: string, routes: RouteEntry[]): void
   refreshRoutes(routes: RouteEntry[]): void
@@ -29,6 +42,23 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   apps: [],
   droppedTotal: 0,
   progressByRun: {},
+  insights: null,
+  insightsLoading: false,
+  insightsError: null,
+  insightsDismissed: [],
+  insightsGrouping: 'severity',
+  setInsights: (response) => set({ insights: response, insightsError: null, insightsLoading: false }),
+  setInsightsLoading: (loading) => set({ insightsLoading: loading }),
+  setInsightsError: (error) => set({ insightsError: error, insightsLoading: false }),
+  dismissFinding: (ruleId, routePattern) =>
+    set((state) => {
+      const key = `${ruleId}::${routePattern ?? ''}`
+      return state.insightsDismissed.includes(key)
+        ? state
+        : { insightsDismissed: [...state.insightsDismissed, key] }
+    }),
+  restoreDismissed: () => set({ insightsDismissed: [] }),
+  setInsightsGrouping: (grouping) => set({ insightsGrouping: grouping }),
   addSpans: (spans, childSpans, appName) =>
     set((state) => {
       void appName

@@ -1,6 +1,7 @@
 import type {
   DependencyGraph,
   GeneratedScenario,
+  InsightsResponse,
   RouteEntry,
   RouteStatsEntry,
   RunDetail,
@@ -26,6 +27,7 @@ export const api = {
   runs: () => getJson<RunSummary[]>('/api/load-runs'),
   runById: (id: string) => getJson<RunDetail>(`/api/load-runs/${encodeURIComponent(id)}`),
   meta: () => getJson<{ meta: unknown }>('/api/meta'),
+  insights: () => getJson<InsightsResponse>('/api/insights'),
   startRun: async (body: unknown): Promise<{ runId: string }> => {
     const response = await fetch('/api/load-runs', {
       method: 'POST',

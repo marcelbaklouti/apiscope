@@ -80,3 +80,35 @@ export interface DependencyGraph {
   nodes: DependencyNode[]
   edges: DependencyEdge[]
 }
+
+export type FindingCategory =
+  | 'performance'
+  | 'payload'
+  | 'caching'
+  | 'database'
+  | 'dependencies'
+  | 'reliability'
+  | 'code'
+export type FindingSeverity = 'critical' | 'warning' | 'advisory'
+
+export interface Finding {
+  ruleId: string
+  category: FindingCategory
+  severity: FindingSeverity
+  title: string
+  whatAndWhy: string
+  impact: { metric: string; humanized: string }
+  scope: { level: 'global' | 'route' | 'app'; routePattern?: string; appName?: string }
+  evidence: { spanIds: string[]; deepLink: string }
+  fix: { framework: string; explanation: string; codeSnippet?: string; docsUrl?: string }
+  sampleSize: number
+}
+
+export interface InsightsResponse {
+  findings: Finding[]
+  rulesRun: string[]
+  insufficientData: boolean
+  advisorEnabled: boolean
+  windowSampleSize: number
+  error?: string
+}
