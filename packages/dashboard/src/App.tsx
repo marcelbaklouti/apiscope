@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useHashRoute } from './lib/router'
 import { useLiveConnection } from './lib/live'
 import { useDashboardStore } from './lib/store'
@@ -60,13 +60,114 @@ export function App() {
   return <DashboardShell />
 }
 
+interface PrimaryDestination {
+  to: string
+  label: string
+  view: string
+  icon: ReactNode
+}
+
+const PRIMARY_DESTINATIONS: PrimaryDestination[] = [
+  {
+    to: '/insights',
+    label: 'Insights',
+    view: 'insights',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M10 2.5a5.5 5.5 0 0 0-3 10.11V15h6v-2.39A5.5 5.5 0 0 0 10 2.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M8 17.5h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    )
+  },
+  {
+    to: '/routes',
+    label: 'Routes',
+    view: 'routes',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M4 5.5h12M4 10h12M4 14.5h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    )
+  },
+  {
+    to: '/inspector',
+    label: 'Inspector',
+    view: 'inspector',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <circle cx="8.75" cy="8.75" r="4.75" stroke="currentColor" strokeWidth="1.4" />
+        <path d="m12.5 12.5 3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    )
+  }
+]
+
+const MORE_DESTINATIONS: Array<{ to: string; label: string; view: string }> = [
+  { to: '/overview', label: 'Overview', view: 'overview' },
+  { to: '/flamegraph', label: 'Flamegraph', view: 'flamegraph' },
+  { to: '/dependencies', label: 'Dependencies', view: 'dependencies' },
+  { to: '/load', label: 'Load', view: 'load' },
+  { to: '/runs', label: 'Runs', view: 'runs' },
+  { to: '/config', label: 'Config', view: 'config' }
+]
+
+function MobileNav({ view, onOpenMore }: { view: string; onOpenMore: () => void }) {
+  const moreActive = MORE_DESTINATIONS.some((destination) => destination.view === view)
+  return (
+    <nav className="mobile-nav" data-testid="mobile-nav" aria-label="primary">
+      {PRIMARY_DESTINATIONS.map((destination) => {
+        const active = destination.view === view || (destination.view === 'insights' && view === '')
+        return (
+          <a key={destination.to} className="mobile-nav-item" href={`#${destination.to}`} data-active={active}>
+            {destination.icon}
+            <span>{destination.label}</span>
+          </a>
+        )
+      })}
+      <button type="button" className="mobile-nav-item" data-testid="mobile-more-toggle" data-active={moreActive} onClick={onOpenMore}>
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <circle cx="4.5" cy="10" r="1.4" fill="currentColor" />
+          <circle cx="10" cy="10" r="1.4" fill="currentColor" />
+          <circle cx="15.5" cy="10" r="1.4" fill="currentColor" />
+        </svg>
+        <span>More</span>
+      </button>
+    </nav>
+  )
+}
+
+function MoreDrawer({ view, onClose }: { view: string; onClose: () => void }) {
+  return (
+    <div className="mobile-more-scrim" role="dialog" aria-label="more views" onClick={onClose}>
+      <div className="mobile-more" data-testid="mobile-more" onClick={(event) => event.stopPropagation()}>
+        <div className="mobile-more-grip" aria-hidden="true" />
+        {MORE_DESTINATIONS.map((destination) => (
+          <a
+            key={destination.to}
+            className="mobile-more-link"
+            href={`#${destination.to}`}
+            data-active={destination.view === view}
+            onClick={onClose}
+          >
+            {destination.label}
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function DashboardShell() {
   const { segments } = useHashRoute()
   const connected = useLiveConnection()
   const droppedTotal = useDashboardStore((state) => state.droppedTotal)
   const [theme, toggleTheme] = useTheme()
+  const [moreOpen, setMoreOpen] = useState(false)
   const view = segments[0] ?? 'insights'
   const insightsActive = view === 'insights' || segments.length === 0
+  useEffect(() => {
+    setMoreOpen(false)
+  }, [view])
   return (
     <div className="layout">
       <header className="topbar">
@@ -102,7 +203,7 @@ function DashboardShell() {
         </div>
       )}
       <LatencyStrip theme={theme} />
-      <main>
+      <main data-view={view}>
         {view === 'insights' && <Insights />}
         {view === 'overview' && <Overview />}
         {view === 'routes' && <Routes />}
@@ -114,6 +215,8 @@ function DashboardShell() {
         {view === 'runs' && <Runs runId={segments[1] ?? null} />}
         {view === 'config' && <ConfigView />}
       </main>
+      <MobileNav view={view} onOpenMore={() => setMoreOpen(true)} />
+      {moreOpen && <MoreDrawer view={view} onClose={() => setMoreOpen(false)} />}
       <CommandPalette />
     </div>
   )

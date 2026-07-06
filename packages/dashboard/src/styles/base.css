@@ -301,11 +301,194 @@ main {
   overflow: auto;
 }
 
+.mobile-nav {
+  display: none;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   a,
   button,
   tr {
     transition: color 120ms, border-color 120ms, background-color 120ms;
+  }
+
+  main[data-view] {
+    animation: view-in var(--motion-duration-base) var(--motion-ease) both;
+  }
+
+  @keyframes view-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar nav {
+    display: none;
+  }
+
+  .topbar {
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  main {
+    padding: var(--space-3) var(--space-3) calc(var(--mobile-nav-height) + var(--space-6));
+  }
+
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .insights {
+    padding: var(--space-1) 0 var(--space-8);
+    gap: var(--space-4);
+  }
+
+  .verdict {
+    border-radius: 10px;
+    padding: var(--space-5) var(--space-5) var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .verdict-headline {
+    font-size: clamp(26px, 8vw, 34px);
+  }
+
+  .verdict-stats {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+
+  .insights-toolbar {
+    gap: var(--space-2);
+  }
+
+  main > table,
+  main > section > table,
+  main .table-scroll > table {
+    min-width: 640px;
+  }
+
+  .finding-toggle-btn {
+    padding: var(--space-3) var(--space-2) var(--space-3) var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .mobile-nav {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 40;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    height: var(--mobile-nav-height);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+    backdrop-filter: blur(14px) saturate(150%);
+    border-top: 1px solid var(--border);
+    box-shadow: var(--elevation-2);
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 44px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: var(--text-2xs);
+    letter-spacing: 0.01em;
+    padding: var(--space-1);
+    cursor: pointer;
+  }
+
+  .mobile-nav-item[data-active='true'] {
+    color: var(--text);
+  }
+
+  .mobile-nav-item[data-active='true'] svg {
+    color: var(--accent);
+  }
+
+  .mobile-more-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-end;
+  }
+
+  .mobile-more {
+    width: 100%;
+    background: var(--surface-2);
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    border-top: 1px solid var(--border);
+    box-shadow: var(--elevation-2);
+    padding: var(--space-2) var(--space-3) calc(var(--space-4) + env(safe-area-inset-bottom, 0));
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobile-more-grip {
+    align-self: center;
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border);
+    margin: var(--space-2) 0 var(--space-3);
+  }
+
+  .mobile-more-link {
+    padding: var(--space-3) var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border-hairline);
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .mobile-more-link:last-child {
+    border-bottom: none;
+  }
+
+  .mobile-more-link[data-active='true'] {
+    color: var(--accent);
+  }
+}
+
+@media (max-width: 640px) and (prefers-reduced-motion: no-preference) {
+  .mobile-more {
+    animation: drawer-up var(--motion-duration-base) var(--motion-ease) both;
+  }
+
+  @keyframes drawer-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
   }
 }
 

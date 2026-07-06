@@ -199,33 +199,35 @@ export function Inspector({ spanId, loadRunId = null }: { spanId: string | null;
             onChange={(event) => setStatusFilter(event.target.value)}
           />
         </div>
-        <table data-testid="span-list">
-          <thead>
-            <tr>
-              <th>method</th>
-              <th>path</th>
-              <th className="num">status</th>
-              <th className="num">duration</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.slice(0, 100).map((span) => (
-              <tr
-                key={span.id}
-                data-selected={span.id === spanId}
-                onClick={() => navigate(inspectorPathFor(span.id))}
-                style={{ cursor: 'pointer' }}
-              >
-                <td className="mono">{span.method}</td>
-                <td className="mono">{span.actualPath}</td>
-                <td className="num" style={{ color: span.statusCode >= 500 ? 'var(--status-5xx)' : undefined }}>
-                  {span.statusCode}
-                </td>
-                <td className="num">{span.timing.duration.toFixed(1)}ms</td>
+        <div className="table-scroll" data-testid="table-scroll">
+          <table data-testid="span-list">
+            <thead>
+              <tr>
+                <th>method</th>
+                <th>path</th>
+                <th className="num">status</th>
+                <th className="num">duration</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.slice(0, 100).map((span) => (
+                <tr
+                  key={span.id}
+                  data-selected={span.id === spanId}
+                  onClick={() => navigate(inspectorPathFor(span.id))}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td className="mono">{span.method}</td>
+                  <td className="mono">{span.actualPath}</td>
+                  <td className="num" style={{ color: span.statusCode >= 500 ? 'var(--status-5xx)' : undefined }}>
+                    {span.statusCode}
+                  </td>
+                  <td className="num">{span.timing.duration.toFixed(1)}ms</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
       <section>
         {detail === null ? (

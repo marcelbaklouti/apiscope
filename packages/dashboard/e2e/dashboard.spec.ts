@@ -50,6 +50,21 @@ test('all-clear empty state lists what was checked', async ({ page }) => {
   await expect(page.getByTestId('insights-checked')).toBeVisible()
 })
 
+test('mobile layout collapses nav and avoids horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/#/insights')
+  await expect(page.getByTestId('mobile-nav')).toBeVisible()
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
+  expect(overflow).toBe(true)
+})
+
+test('routes table does not break the page layout on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/#/routes')
+  const bodyOverflow = await page.evaluate(() => document.body.scrollWidth <= window.innerWidth + 1)
+  expect(bodyOverflow).toBe(true)
+})
+
 test('overview renders seeded traffic', async ({ page }) => {
   await page.goto('/#/overview')
   await expect(page.getByTestId('span-count')).toContainText('65 requests')

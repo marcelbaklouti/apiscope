@@ -25,23 +25,24 @@ export function Routes() {
       .map((span) => span.timing.duration)
       .reverse()
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>method</th>
-          <th>pattern</th>
-          <th>app</th>
-          <th>source</th>
-          <th className="num">count</th>
-          <th className="num">errors</th>
-          <th className="num">p50</th>
-          <th className="num">p95</th>
-          <th className="num">p99</th>
-          <th>trend</th>
-          <th>n+1</th>
-        </tr>
-      </thead>
-      <tbody>
+    <div className="table-scroll" data-testid="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>method</th>
+            <th>pattern</th>
+            <th>app</th>
+            <th>source</th>
+            <th className="num">count</th>
+            <th className="num">errors</th>
+            <th className="num">p50</th>
+            <th className="num">p95</th>
+            <th className="num">p99</th>
+            <th>trend</th>
+            <th>n+1</th>
+          </tr>
+        </thead>
+        <tbody>
         {routes.map((route) => {
           const routeStats = statsFor(route.method, route.pattern)
           return (
@@ -68,7 +69,8 @@ export function Routes() {
             </tr>
           )
         })}
-      </tbody>
-    </table>
+        </tbody>
+      </table>
+    </div>
   )
 }
