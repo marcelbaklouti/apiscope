@@ -1,16 +1,30 @@
 {
   "name": "@apiscope/dashboard",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "private": false,
   "description": "apiscope dashboard UI",
-  "repository": { "type": "git", "url": "git+https://github.com/marcelbaklouti/apiscope.git", "directory": "packages/dashboard" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marcelbaklouti/apiscope.git",
+    "directory": "packages/dashboard"
+  },
   "homepage": "https://github.com/marcelbaklouti/apiscope#readme",
   "bugs": "https://github.com/marcelbaklouti/apiscope/issues",
-  "keywords": ["apiscope", "api", "monitoring", "load-testing", "devtools"],
-  "publishConfig": { "access": "public" },
+  "keywords": [
+    "apiscope",
+    "api",
+    "monitoring",
+    "load-testing",
+    "devtools"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",

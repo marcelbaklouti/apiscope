@@ -1,13 +1,26 @@
 {
   "name": "@apiscope/mcp",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "MCP server exposing apiscope's collector API as tools for coding agents",
-  "repository": { "type": "git", "url": "git+https://github.com/marcelbaklouti/apiscope.git", "directory": "packages/mcp" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marcelbaklouti/apiscope.git",
+    "directory": "packages/mcp"
+  },
   "homepage": "https://github.com/marcelbaklouti/apiscope#readme",
   "bugs": "https://github.com/marcelbaklouti/apiscope/issues",
-  "keywords": ["apiscope", "api", "monitoring", "load-testing", "devtools", "mcp"],
-  "publishConfig": { "access": "public" },
+  "keywords": [
+    "apiscope",
+    "api",
+    "monitoring",
+    "load-testing",
+    "devtools",
+    "mcp"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -19,7 +32,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",

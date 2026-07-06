@@ -1,13 +1,25 @@
 {
   "name": "@apiscope/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Span model and wire protocol for apiscope",
-  "repository": { "type": "git", "url": "git+https://github.com/marcelbaklouti/apiscope.git", "directory": "packages/core" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marcelbaklouti/apiscope.git",
+    "directory": "packages/core"
+  },
   "homepage": "https://github.com/marcelbaklouti/apiscope#readme",
   "bugs": "https://github.com/marcelbaklouti/apiscope/issues",
-  "keywords": ["apiscope", "api", "monitoring", "load-testing", "devtools"],
-  "publishConfig": { "access": "public" },
+  "keywords": [
+    "apiscope",
+    "api",
+    "monitoring",
+    "load-testing",
+    "devtools"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -19,7 +31,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",

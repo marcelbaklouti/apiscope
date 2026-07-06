@@ -1,13 +1,25 @@
 {
   "name": "@apiscope/adapter-node",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Shared Node.js adapter runtime with span context and undici capture",
-  "repository": { "type": "git", "url": "git+https://github.com/marcelbaklouti/apiscope.git", "directory": "packages/adapter-node" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marcelbaklouti/apiscope.git",
+    "directory": "packages/adapter-node"
+  },
   "homepage": "https://github.com/marcelbaklouti/apiscope#readme",
   "bugs": "https://github.com/marcelbaklouti/apiscope/issues",
-  "keywords": ["apiscope", "api", "monitoring", "load-testing", "devtools"],
-  "publishConfig": { "access": "public" },
+  "keywords": [
+    "apiscope",
+    "api",
+    "monitoring",
+    "load-testing",
+    "devtools"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -19,7 +31,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
@@ -38,11 +52,21 @@
     "pg": "^8.22.0"
   },
   "peerDependenciesMeta": {
-    "@prisma/instrumentation": { "optional": true },
-    "better-sqlite3": { "optional": true },
-    "mongodb": { "optional": true },
-    "mysql2": { "optional": true },
-    "pg": { "optional": true }
+    "@prisma/instrumentation": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    },
+    "mongodb": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
