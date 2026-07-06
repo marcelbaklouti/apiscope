@@ -33,7 +33,7 @@ export async function runLoadTestInProcess(
   scenario: LoadScenario,
   callbacks: RunCallbacks = {}
 ): Promise<LoadRunResult> {
-  assertAllowedTarget(scenario.baseUrl, scenario.allowRemoteHosts)
+  await assertAllowedTarget(scenario.baseUrl, scenario.allowRemoteHosts)
   const runId = newTraceId().slice(0, 16)
   const aggregator = new RunAggregator(scenario, runId)
   const state = { fatal: null as string | null, lastWindowAllErrors: false }
@@ -49,7 +49,7 @@ export async function runLoadTestInProcess(
 }
 
 export async function runLoadTest(scenario: LoadScenario, callbacks: RunCallbacks = {}): Promise<LoadRunResult> {
-  assertAllowedTarget(scenario.baseUrl, scenario.allowRemoteHosts)
+  await assertAllowedTarget(scenario.baseUrl, scenario.allowRemoteHosts)
   const workerCount = Math.max(1, scenario.workers ?? 1)
   const runId = newTraceId().slice(0, 16)
   const aggregator = new RunAggregator(scenario, runId)
