@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { verify as verifyPassword } from 'argon2'
 import { parseCookie, stringifySetCookie } from 'cookie'
 import * as openidClient from 'openid-client'
+import { createPendingStateStore } from './pending-state'
 import { createSessionCodec, type SessionCodec } from './session'
 
 export interface DashboardIdentity {
@@ -27,6 +28,8 @@ export type DashboardAuthConfig =
 
 const sessionCookieName = 'apiscope_session'
 const sessionTtlSeconds = 60 * 60 * 12
+const pendingLoginTtlMs = 10 * 60 * 1000
+const maxPendingLogins = 1000
 
 function headerValue(request: IncomingMessage, name: string): string | null {
   const value = request.headers[name]
@@ -128,7 +131,7 @@ export async function createDashboardAuthenticator(config: DashboardAuthConfig):
   }
 
   const oidcConfig = await openidClient.discovery(new URL(config.issuer), config.clientId, config.clientSecret)
-  const pendingByState = new Map<string, { verifier: string }>()
+  const pendingByState = createPendingStateStore<{ verifier: string }>({ ttlMs: pendingLoginTtlMs, maxEntries: maxPendingLogins })
 
   routes.set('GET /auth/login', async (request, response) => {
     const verifier = openidClient.randomPKCECodeVerifier()

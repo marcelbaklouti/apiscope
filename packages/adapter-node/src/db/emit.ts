@@ -1,4 +1,4 @@
-import { newSpanId, type DbChildSpan } from '@apiscope/core'
+import { capBody, newSpanId, type DbChildSpan } from '@apiscope/core'
 import { getActiveRuntime } from './registry'
 
 interface DbSpanDescriptor {
@@ -34,7 +34,7 @@ function buildChildSpan(
     traceId,
     kind: 'db',
     system: descriptor.system,
-    statement: descriptor.statement,
+    statement: capBody(descriptor.statement).body,
     operation: descriptor.operation,
     target: descriptor.target,
     rowCount,
