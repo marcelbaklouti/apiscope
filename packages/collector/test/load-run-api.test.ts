@@ -80,9 +80,11 @@ describe('load run api', () => {
     expect(response.status).toBe(400)
   })
 
-  it('serves meta', async () => {
-    collector = createCollector({ dbPath: ':memory:', port: 0, meta: { hello: 'world' } })
+  it('serves the safe projection of meta', async () => {
+    collector = createCollector({ dbPath: ':memory:', port: 0, meta: { collector: { retentionRows: 42 } } })
     const { port } = await collector.listen()
-    expect(await (await fetch(`http://127.0.0.1:${port}/api/meta`)).json()).toEqual({ meta: { hello: 'world' } })
+    expect(await (await fetch(`http://127.0.0.1:${port}/api/meta`)).json()).toEqual({
+      meta: { collector: { retentionRows: 42 } }
+    })
   })
 })

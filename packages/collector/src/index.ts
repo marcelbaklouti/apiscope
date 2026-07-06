@@ -14,6 +14,7 @@ import { createOtlpGrpcServer } from './otlp/receiver-grpc'
 import { createOtlpHttpHandler } from './otlp/receiver-http'
 import { ProfileChannelRegistry, type ProfileResult } from './profiles/registry'
 import { ProfileResultStore } from './profiles/store'
+import { buildSafeMeta } from './safe-meta'
 import { createKeepAllSampler } from './sampling/sampler'
 import { createStaticHandler } from './static'
 import { SqliteSpanStore } from './store'
@@ -229,7 +230,7 @@ export function createCollector(options: CollectorOptions): Collector {
     const spansWithChildren = await loadRecentSpansWithChildren(store, DEPENDENCY_GRAPH_RECENT_SPAN_WINDOW)
     sendJson(response, 200, buildDependencyGraph(spansWithChildren))
   })
-  routes.set('GET /api/meta', (request, response) => sendJson(response, 200, { meta: options.meta ?? null }))
+  routes.set('GET /api/meta', (request, response) => sendJson(response, 200, { meta: buildSafeMeta(options.meta) }))
   routes.set('GET /api/load-runs', async (request, response) => sendJson(response, 200, await store.listLoadRuns()))
   routes.set('POST /api/load-runs', async (request, response) => {
     const raw = await readBody(request)
