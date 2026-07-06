@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { PROTOCOL_VERSION } from '../src/index'
+import { MAX_ROUTES_PER_MESSAGE, MAX_SPANS_PER_MESSAGE, PROTOCOL_VERSION } from '../src/constants'
 import { decodeWireMessage, encodeWireMessage } from '../src/protocol'
 import type { HandshakeMessage, ProfileRequestMessage, ProfileResultMessage, SpanBatchMessage, WireMessage } from '../src/protocol'
 import type { FlameNode, RequestSpan } from '../src/types'
@@ -135,6 +135,26 @@ describe('encodeWireMessage and decodeWireMessage', () => {
       ok: false,
       error: { kind: 'invalid-shape', issues: [{ path: 'spans[0].statusCode', expected: 'number' }] }
     })
+  })
+
+  it('rejects a span batch exceeding the combined array cap', () => {
+    const overflow = MAX_SPANS_PER_MESSAGE + 1
+    const spans = Array.from({ length: overflow }, () => validRequestSpan)
+    const decoded = decodeWireMessage(
+      JSON.stringify({ type: 'span-batch', protocolVersion: PROTOCOL_VERSION, spans, childSpans: [], droppedCount: 0 })
+    )
+    expect(decoded.ok).toBe(false)
+    if (!decoded.ok) expect(decoded.error.kind).toBe('invalid-shape')
+  })
+
+  it('rejects a registry-update exceeding the routes cap', () => {
+    const overflow = MAX_ROUTES_PER_MESSAGE + 1
+    const routes = Array.from({ length: overflow }, () => ({ method: 'GET', pattern: '/health' }))
+    const decoded = decodeWireMessage(
+      JSON.stringify({ type: 'registry-update', protocolVersion: PROTOCOL_VERSION, routes })
+    )
+    expect(decoded.ok).toBe(false)
+    if (!decoded.ok) expect(decoded.error.kind).toBe('invalid-shape')
   })
 
   it('round-trips arbitrary span batches', () => {

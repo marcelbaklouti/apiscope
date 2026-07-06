@@ -14,6 +14,12 @@ describe('redactHeaders', () => {
     expect(result.headers).toEqual({ 'x-api-key': '[redacted]' })
     expect(result.redactedHeaders).toEqual(['x-api-key'])
   })
+
+  it('redacts proxy-authorization and x-api-key by default', () => {
+    const result = redactHeaders({ 'Proxy-Authorization': 'Basic abc', 'X-Api-Key': 'secret', Accept: 'application/json' })
+    expect(result.headers).toEqual({ 'Proxy-Authorization': '[redacted]', 'X-Api-Key': '[redacted]', Accept: 'application/json' })
+    expect(result.redactedHeaders.sort()).toEqual(['proxy-authorization', 'x-api-key'])
+  })
 })
 
 describe('capBody', () => {

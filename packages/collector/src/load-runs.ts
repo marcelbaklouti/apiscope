@@ -8,20 +8,26 @@ export interface LoadRunRequest {
   assertions?: LoadAssertions
 }
 
-export function startLoadRun(request: LoadRunRequest, store: SpanStore, hub: LiveTransport): { runId: string } {
-  assertAllowedTarget(request.scenario.baseUrl, request.scenario.allowRemoteHosts)
+export async function startLoadRun(
+  request: LoadRunRequest,
+  store: SpanStore,
+  hub: LiveTransport,
+  operatorAllowRemoteHosts: string[] = []
+): Promise<{ runId: string }> {
+  const scenario: LoadScenario = { ...request.scenario, allowRemoteHosts: operatorAllowRemoteHosts }
+  await assertAllowedTarget(scenario.baseUrl, operatorAllowRemoteHosts)
   const runId = randomUUID()
   const startedAt = Date.now()
-  void runLoadTest(request.scenario, {
+  void runLoadTest(scenario, {
     onProgress: (snapshot) =>
-      hub.publish({ type: 'load-progress', runId, name: request.scenario.name, snapshot })
+      hub.publish({ type: 'load-progress', runId, name: scenario.name, snapshot })
   })
     .then(async (result) => {
       await store.insertLoadRun({
         id: runId,
-        name: request.scenario.name,
+        name: scenario.name,
         startedAt,
-        scenarioJson: JSON.stringify({ scenario: request.scenario, assertions: request.assertions ?? null }),
+        scenarioJson: JSON.stringify({ scenario, assertions: request.assertions ?? null }),
         resultJson: JSON.stringify(result)
       })
       hub.publish({ type: 'load-finished', runId, ok: !result.aborted })

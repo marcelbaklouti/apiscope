@@ -253,6 +253,9 @@ async function startCollectorServer(configPath: string | null, options: StartCol
     sampler,
     ...(tls === undefined ? {} : { tls }),
     ...(production?.allowInsecure === undefined ? {} : { allowInsecure: production.allowInsecure }),
+    ...(config.collector?.loadAllowRemoteHosts === undefined ? {} : { loadAllowRemoteHosts: config.collector.loadAllowRemoteHosts }),
+    ...(config.collector?.allowedOrigins === undefined ? {} : { allowedOrigins: config.collector.allowedOrigins }),
+    ...(config.collector?.maxRequestBytes === undefined ? {} : { maxRequestBytes: config.collector.maxRequestBytes }),
     ...otlpOptions,
     meta: config
   })

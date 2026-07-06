@@ -98,6 +98,57 @@ describe('otlp http receiver', () => {
     await vi.waitFor(() => expect(publishedAppNames).toEqual(['app-a']), { timeout: 2000 })
   })
 
+  it('does not crash on an OTLP export carrying a non-numeric timestamp', async () => {
+    collector = createCollector({ dbPath: ':memory:', port: 0, otlpIngest: { http: true } })
+    const { port } = await collector.listen()
+    const malformed = {
+      resourceSpans: [
+        {
+          resource: { attributes: [{ key: 'service.name', value: { stringValue: 'evil' } }] },
+          scopeSpans: [
+            {
+              scope: { name: 'apiscope' },
+              spans: [
+                {
+                  traceId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+                  spanId: 'aaaaaaaaaaaaaaaa',
+                  name: 'GET /x',
+                  kind: 2,
+                  startTimeUnixNano: 'not-a-number',
+                  endTimeUnixNano: 'also-not-a-number',
+                  attributes: [],
+                  status: { code: 1 }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    const response = await fetch(`http://127.0.0.1:${port}/v1/traces`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(malformed)
+    })
+    expect(response.status).toBeLessThan(500)
+    const health = await fetch(`http://127.0.0.1:${port}/health`)
+    expect(health.status).toBe(200)
+  })
+
+  it('rejects an oversized OTLP body with 413 and stays up', async () => {
+    collector = createCollector({ dbPath: ':memory:', port: 0, otlpIngest: { http: true }, maxRequestBytes: 1024 })
+    const { port } = await collector.listen()
+    const oversized = 'a'.repeat(4096)
+    const response = await fetch(`http://127.0.0.1:${port}/v1/traces`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ padding: oversized })
+    })
+    expect(response.status).toBe(413)
+    const health = await fetch(`http://127.0.0.1:${port}/health`)
+    expect(health.status).toBe(200)
+  })
+
   it('rejects an OTLP HTTP export with no token when a token authenticator is configured', async () => {
     const ingestAuth = createTokenIngestAuthenticator([{ appName: 'app-a', token: 'app-a-token' }])
     collector = createCollector({ dbPath: ':memory:', port: 0, ingestAuth, otlpIngest: { http: true } })

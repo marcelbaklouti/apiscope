@@ -147,4 +147,30 @@ describe('WebSocket ingest and live subscriptions', () => {
     const live = await connect(`ws://127.0.0.1:${port}/ws/live`)
     live.close()
   })
+
+  it('rejects a live upgrade from a foreign origin', async () => {
+    collector = createCollector({ dbPath: ':memory:', port: 0 })
+    const { port } = await collector.listen()
+    await expect(connect(`ws://127.0.0.1:${port}/ws/live`, { origin: 'http://evil.example.com' })).rejects.toThrow()
+  })
+
+  it('rejects an ingest upgrade from a foreign origin', async () => {
+    collector = createCollector({ dbPath: ':memory:', port: 0 })
+    const { port } = await collector.listen()
+    await expect(connect(`ws://127.0.0.1:${port}/ws/ingest`, { origin: 'http://evil.example.com' })).rejects.toThrow()
+  })
+
+  it('accepts a live upgrade whose origin matches the host', async () => {
+    collector = createCollector({ dbPath: ':memory:', port: 0 })
+    const { port } = await collector.listen()
+    const live = await connect(`ws://127.0.0.1:${port}/ws/live`, { origin: `http://127.0.0.1:${port}` })
+    live.close()
+  })
+
+  it('accepts a live upgrade from an explicitly allowed origin', async () => {
+    collector = createCollector({ dbPath: ':memory:', port: 0, allowedOrigins: ['http://trusted.example.com'] })
+    const { port } = await collector.listen()
+    const live = await connect(`ws://127.0.0.1:${port}/ws/live`, { origin: 'http://trusted.example.com' })
+    live.close()
+  })
 })

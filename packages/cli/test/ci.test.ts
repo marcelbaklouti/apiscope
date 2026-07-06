@@ -100,6 +100,30 @@ describe('runCi', () => {
     expect(run.exitCode).toBe(2)
   })
 
+  it('exits 2 when the readiness url is not an allowed target and never probes it', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'apiscope-ci-'))
+    const config: ApiscopeConfig = {
+      ci: {
+        readiness: { url: 'http://169.254.169.254/latest/meta-data/', timeoutMs: 800, intervalMs: 100 },
+        scenarios: [
+          {
+            scenario: {
+              name: 'ssrf-readiness',
+              baseUrl: 'http://127.0.0.1:3000',
+              targets: [{ method: 'GET', path: '/' }],
+              model: { kind: 'open', phases: [{ durationMs: 100, rps: 5 }] }
+            }
+          }
+        ]
+      }
+    }
+    const started = Date.now()
+    const run = await runCi({ config, cwd })
+    expect(run.exitCode).toBe(2)
+    expect(run.reportText).toContain('ci.readiness.url')
+    expect(Date.now() - started).toBeLessThan(700)
+  })
+
   it('writes a baseline and then detects regressions against it', async () => {
     const fastBaseUrl = await startTarget(5)
     const cwd = mkdtempSync(join(tmpdir(), 'apiscope-ci-'))

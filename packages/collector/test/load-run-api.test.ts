@@ -80,6 +80,57 @@ describe('load run api', () => {
     expect(response.status).toBe(400)
   })
 
+  it('rejects a load run targeting link-local metadata even when the body allowlists it', async () => {
+    collector = createCollector({ dbPath: ':memory:', port: 0 })
+    const { port } = await collector.listen()
+    const response = await fetch(`http://127.0.0.1:${port}/api/load-runs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        scenario: {
+          name: 'ssrf',
+          baseUrl: 'http://169.254.169.254/',
+          allowRemoteHosts: ['169.254.169.254'],
+          targets: [{ method: 'GET', path: '/latest/meta-data/' }],
+          model: { kind: 'open', phases: [{ durationMs: 100, rps: 5 }] }
+        }
+      })
+    })
+    expect(response.status).toBe(400)
+  })
+
+  it('strips hooksModule from a network-supplied scenario before running', async () => {
+    const targetUrl = await startTarget()
+    collector = createCollector({ dbPath: ':memory:', port: 0 })
+    const { port } = await collector.listen()
+    const events: LiveEvent[] = []
+    collector.hub.subscribe((event) => {
+      if (event.type === 'load-finished') events.push(event)
+    })
+    const response = await fetch(`http://127.0.0.1:${port}/api/load-runs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        scenario: {
+          name: 'hooks-strip',
+          baseUrl: targetUrl,
+          hooksModule: '/tmp/apiscope-should-never-import.js',
+          targets: [{ method: 'GET', path: '/' }],
+          model: { kind: 'open', phases: [{ durationMs: 300, rps: 10 }] }
+        }
+      })
+    })
+    expect(response.status).toBe(202)
+    const { runId } = (await response.json()) as { runId: string }
+    await vi.waitFor(() => expect(events.some((event) => event.type === 'load-finished' && event.runId === runId)).toBe(true), {
+      timeout: 10000
+    })
+    const detail = (await (await fetch(`http://127.0.0.1:${port}/api/load-runs/${runId}`)).json()) as {
+      scenario: { hooksModule?: string }
+    }
+    expect(detail.scenario.hooksModule).toBeUndefined()
+  }, 15000)
+
   it('serves the safe projection of meta', async () => {
     collector = createCollector({ dbPath: ':memory:', port: 0, meta: { collector: { retentionRows: 42 } } })
     const { port } = await collector.listen()

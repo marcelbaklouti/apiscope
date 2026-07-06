@@ -39,11 +39,18 @@ export interface CollectorOptions {
   otlpExport?: OtlpExportConfig
   otlpIngest?: OtlpIngestOptions
   advisor?: AdvisorConfigInput
+  loadAllowRemoteHosts?: string[]
+  allowedOrigins?: string[]
+  maxRequestBytes?: number
 }
 
 export type RouteHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => void | Promise<void>
 
 export type DynamicHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => boolean | Promise<boolean>
+
+export const DEFAULT_MAX_REQUEST_BYTES = 16 * 1024 * 1024
+
+export class PayloadTooLargeError extends Error {}
 
 export function sendJson(response: ServerResponse, statusCode: number, body: unknown): void {
   const payload = JSON.stringify(body)
@@ -51,14 +58,34 @@ export function sendJson(response: ServerResponse, statusCode: number, body: unk
   response.end(payload)
 }
 
-export async function readRawBody(request: IncomingMessage): Promise<Buffer> {
+export async function readRawBody(request: IncomingMessage, maxBytes: number = DEFAULT_MAX_REQUEST_BYTES): Promise<Buffer> {
   const chunks: Buffer[] = []
-  for await (const chunk of request) chunks.push(chunk as Buffer)
+  let totalBytes = 0
+  for await (const chunk of request) {
+    const buffer = chunk as Buffer
+    totalBytes += buffer.length
+    if (totalBytes > maxBytes) {
+      request.pause()
+      throw new PayloadTooLargeError(`request body exceeds ${maxBytes} bytes`)
+    }
+    chunks.push(buffer)
+  }
   return Buffer.concat(chunks)
 }
 
-export async function readBody(request: IncomingMessage): Promise<string> {
-  return (await readRawBody(request)).toString('utf8')
+export async function readBody(request: IncomingMessage, maxBytes: number = DEFAULT_MAX_REQUEST_BYTES): Promise<string> {
+  return (await readRawBody(request, maxBytes)).toString('utf8')
+}
+
+function respondToHandlerError(response: ServerResponse, error: unknown): void {
+  if (response.headersSent) return
+  if (error instanceof PayloadTooLargeError) {
+    const payload = JSON.stringify({ error: 'payload-too-large' })
+    response.writeHead(413, { 'content-type': 'application/json', connection: 'close' })
+    response.end(payload)
+    return
+  }
+  sendJson(response, 500, { error: 'internal' })
 }
 
 export function createRequestListener(routes: Map<string, RouteHandler>, dynamicHandlers: DynamicHandler[] = []): RequestListener {
@@ -68,13 +95,18 @@ export function createRequestListener(routes: Map<string, RouteHandler>, dynamic
     if (handler) {
       try {
         await handler(request, response, url)
-      } catch {
-        if (!response.headersSent) sendJson(response, 500, { error: 'internal' })
+      } catch (error) {
+        respondToHandlerError(response, error)
       }
       return
     }
-    for (const dynamicHandler of dynamicHandlers) {
-      if (await dynamicHandler(request, response, url)) return
+    try {
+      for (const dynamicHandler of dynamicHandlers) {
+        if (await dynamicHandler(request, response, url)) return
+      }
+    } catch (error) {
+      respondToHandlerError(response, error)
+      return
     }
     sendJson(response, 404, { error: 'not-found' })
   }

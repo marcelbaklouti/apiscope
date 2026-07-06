@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION } from './constants'
+import { MAX_ROUTES_PER_MESSAGE, MAX_SPANS_PER_MESSAGE, PROTOCOL_VERSION } from './constants'
 import type { ChildSpan, FlameNode, RequestSpan, RouteRegistryEntry, Runtime } from './types'
 import {
   validateChildSpan,
@@ -88,6 +88,13 @@ function validateEntries(
   return value.flatMap((entry, index) => prefixIssues(validateEntry(entry), `${field}[${index}]`))
 }
 
+function validateRoutesCapped(value: unknown): ValidationIssue[] {
+  if (Array.isArray(value) && value.length > MAX_ROUTES_PER_MESSAGE) {
+    return [{ path: 'routes', expected: `at most ${MAX_ROUTES_PER_MESSAGE} routes` }]
+  }
+  return validateEntries(value, 'routes', validateRouteRegistryEntry)
+}
+
 function validateHandshake(value: Record<string, unknown>): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   const app = value['app']
@@ -103,14 +110,21 @@ function validateHandshake(value: Record<string, unknown>): ValidationIssue[] {
       issues.push({ path: 'app.pid', expected: 'number' })
     }
   }
-  issues.push(...validateEntries(value['routes'], 'routes', validateRouteRegistryEntry))
+  issues.push(...validateRoutesCapped(value['routes']))
   return issues
 }
 
 function validateSpanBatch(value: Record<string, unknown>): ValidationIssue[] {
   const issues: ValidationIssue[] = []
-  issues.push(...validateEntries(value['spans'], 'spans', validateRequestSpan))
-  issues.push(...validateEntries(value['childSpans'], 'childSpans', validateChildSpan))
+  const spans = value['spans']
+  const childSpans = value['childSpans']
+  const spanCount = Array.isArray(spans) ? spans.length : 0
+  const childSpanCount = Array.isArray(childSpans) ? childSpans.length : 0
+  if (spanCount + childSpanCount > MAX_SPANS_PER_MESSAGE) {
+    return [{ path: 'spans', expected: `at most ${MAX_SPANS_PER_MESSAGE} combined spans and childSpans` }]
+  }
+  issues.push(...validateEntries(spans, 'spans', validateRequestSpan))
+  issues.push(...validateEntries(childSpans, 'childSpans', validateChildSpan))
   if (typeof value['droppedCount'] !== 'number' || value['droppedCount'] < 0) {
     issues.push({ path: 'droppedCount', expected: 'non-negative number' })
   }
@@ -188,7 +202,7 @@ export function decodeWireMessage(raw: string): DecodeResult {
       : type === 'span-batch'
         ? validateSpanBatch(parsed)
         : type === 'registry-update'
-          ? validateEntries(parsed['routes'], 'routes', validateRouteRegistryEntry)
+          ? validateRoutesCapped(parsed['routes'])
           : type === 'profile-request'
             ? validateProfileRequest(parsed)
             : validateProfileResult(parsed)

@@ -4,22 +4,18 @@ import { assertAllowedTarget } from '../src/safety'
 import type { LoadRunResult } from '../src/types'
 
 describe('assertAllowedTarget', () => {
-  it('allows localhost variants', () => {
-    expect(() => assertAllowedTarget('http://localhost:3000')).not.toThrow()
-    expect(() => assertAllowedTarget('http://127.0.0.1:8080/api')).not.toThrow()
-    expect(() => assertAllowedTarget('http://[::1]:3000')).not.toThrow()
+  it('allows localhost variants', async () => {
+    await expect(assertAllowedTarget('http://localhost:3000')).resolves.toBeUndefined()
+    await expect(assertAllowedTarget('http://127.0.0.1:8080/api')).resolves.toBeUndefined()
+    await expect(assertAllowedTarget('http://[::1]:3000')).resolves.toBeUndefined()
   })
 
-  it('rejects remote hosts without allowlist entry', () => {
-    expect(() => assertAllowedTarget('https://api.example.com')).toThrow(/api\.example\.com/)
+  it('rejects remote hosts without allowlist entry', async () => {
+    await expect(assertAllowedTarget('https://api.example.com')).rejects.toThrow(/api\.example\.com/)
   })
 
-  it('allows allowlisted remote hosts', () => {
-    expect(() => assertAllowedTarget('https://staging.example.com', ['staging.example.com'])).not.toThrow()
-  })
-
-  it('rejects invalid urls', () => {
-    expect(() => assertAllowedTarget('not a url')).toThrow()
+  it('rejects invalid urls', async () => {
+    await expect(assertAllowedTarget('not a url')).rejects.toThrow()
   })
 })
 

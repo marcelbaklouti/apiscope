@@ -72,18 +72,18 @@ const productionSchema = z
         z.object({ mode: z.literal('none') }),
         z.object({
           mode: z.literal('password'),
-          sessionSecret: z.string(),
+          sessionSecret: z.string().min(32),
           users: z.array(z.object({ username: z.string(), passwordHash: z.string(), displayName: z.string().optional() }))
         }),
         z.object({
           mode: z.literal('oidc'),
-          sessionSecret: z.string(),
+          sessionSecret: z.string().min(32),
           issuer: z.string(),
           clientId: z.string(),
           clientSecret: z.string(),
           redirectUri: z.string()
         }),
-        z.object({ mode: z.literal('proxy'), userHeader: z.string(), nameHeader: z.string().optional() })
+        z.object({ mode: z.literal('proxy'), userHeader: z.string(), nameHeader: z.string().optional(), trustedProxies: z.array(z.string()).optional() })
       ])
       .optional(),
     tls: z.object({ key: z.string(), cert: z.string(), ca: z.string().optional(), requestCert: z.boolean().optional() }).optional(),
@@ -154,7 +154,10 @@ const configSchema = z.object({
       port: z.number().int().positive().optional(),
       dbPath: z.string().optional(),
       retentionRows: z.number().int().positive().optional(),
-      storage: storageSchema.optional()
+      storage: storageSchema.optional(),
+      loadAllowRemoteHosts: z.array(z.string()).optional(),
+      allowedOrigins: z.array(z.string()).optional(),
+      maxRequestBytes: z.number().int().positive().optional()
     })
     .optional(),
   ci: z
@@ -188,7 +191,7 @@ export type DashboardAuthProductionConfig =
   | { mode: 'none' }
   | { mode: 'password'; sessionSecret: string; users: Array<{ username: string; passwordHash: string; displayName?: string }> }
   | { mode: 'oidc'; sessionSecret: string; issuer: string; clientId: string; clientSecret: string; redirectUri: string }
-  | { mode: 'proxy'; userHeader: string; nameHeader?: string }
+  | { mode: 'proxy'; userHeader: string; nameHeader?: string; trustedProxies?: string[] }
 
 export type LiveTransportConfig = { mode: 'memory' } | { mode: 'valkey'; url: string; channel?: string }
 
@@ -243,7 +246,16 @@ export interface AdvisorConfigShape {
 }
 
 export interface ApiscopeConfig {
-  collector?: { host?: string; port?: number; dbPath?: string; retentionRows?: number; storage?: StorageConfig }
+  collector?: {
+    host?: string
+    port?: number
+    dbPath?: string
+    retentionRows?: number
+    storage?: StorageConfig
+    loadAllowRemoteHosts?: string[]
+    allowedOrigins?: string[]
+    maxRequestBytes?: number
+  }
   ci?: {
     readiness: { url: string; timeoutMs?: number; intervalMs?: number }
     baselinePath?: string

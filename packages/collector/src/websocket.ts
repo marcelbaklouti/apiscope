@@ -1,11 +1,19 @@
-import type { Server } from 'node:http'
+import type { IncomingMessage, Server } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
+import { isAllowedOrigin } from './origin'
 import type { DashboardAuthenticator } from './auth/dashboard-auth'
 import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/ingest-auth'
 import { IngestProcessor, type IngestSession } from './ingest'
 import type { LiveTransport } from './live/live-transport'
 import type { CollectorMetrics } from './metrics'
 import type { ProfileChannelRegistry } from './profiles/registry'
+
+const DEFAULT_MAX_WS_PAYLOAD_BYTES = 8 * 1024 * 1024
+
+export interface WebSocketOptions {
+  allowedOrigins?: string[]
+  maxPayload?: number
+}
 
 export function attachWebSockets(
   server: Server,
@@ -14,10 +22,13 @@ export function attachWebSockets(
   ingestAuth: IngestAuthenticator = createNoneIngestAuthenticator(),
   metrics?: CollectorMetrics,
   profileChannel?: ProfileChannelRegistry,
-  dashboardAuth?: DashboardAuthenticator
+  dashboardAuth?: DashboardAuthenticator,
+  options: WebSocketOptions = {}
 ): void {
-  const ingestServer = new WebSocketServer({ noServer: true })
-  const liveServer = new WebSocketServer({ noServer: true })
+  const allowedOrigins = options.allowedOrigins ?? []
+  const maxPayload = options.maxPayload ?? DEFAULT_MAX_WS_PAYLOAD_BYTES
+  const ingestServer = new WebSocketServer({ noServer: true, maxPayload })
+  const liveServer = new WebSocketServer({ noServer: true, maxPayload })
   let liveSubscriberCount = 0
 
   ingestServer.on('connection', (socket: WebSocket, request) => {
@@ -54,6 +65,13 @@ export function attachWebSockets(
 
   server.on('upgrade', (request, socket, head) => {
     const url = new URL(request.url ?? '/', 'http://localhost')
+    if (url.pathname === '/ws/ingest' || url.pathname === '/ws/live') {
+      if (!isAllowedOrigin(request as IncomingMessage, allowedOrigins)) {
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+        socket.destroy()
+        return
+      }
+    }
     if (url.pathname === '/ws/ingest') {
       const identity = ingestAuth.authenticate(request)
       if (identity === null) {
