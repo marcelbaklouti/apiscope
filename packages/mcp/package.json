@@ -1,0 +1,40 @@
+{
+  "name": "@apiscope/mcp",
+  "version": "0.0.0",
+  "license": "MIT",
+  "description": "MCP server exposing apiscope's collector API as tools for coding agents",
+  "repository": { "type": "git", "url": "git+https://github.com/marcelbaklouti/apiscope.git", "directory": "packages/mcp" },
+  "homepage": "https://github.com/marcelbaklouti/apiscope#readme",
+  "bugs": "https://github.com/marcelbaklouti/apiscope/issues",
+  "keywords": ["apiscope", "api", "monitoring", "load-testing", "devtools", "mcp"],
+  "publishConfig": { "access": "public" },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@apiscope/collector": "workspace:*",
+    "@apiscope/load": "workspace:*",
+    "@types/node": "^26.1.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9"
+  }
+}
