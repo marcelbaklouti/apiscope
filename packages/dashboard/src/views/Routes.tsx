@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { useDashboardStore } from '../lib/store'
 import { Sparkline } from '../components/Sparkline'
+import { MetricExplainer } from '../components/MetricExplainer'
 import type { RouteStatsEntry } from '../lib/types'
 
 export function Routes() {
@@ -34,10 +35,26 @@ export function Routes() {
             <th>app</th>
             <th>source</th>
             <th className="num">count</th>
-            <th className="num">errors</th>
-            <th className="num">p50</th>
-            <th className="num">p95</th>
-            <th className="num">p99</th>
+            <th className="num">
+              <MetricExplainer label="errors" explanation="Requests that returned a 5xx status. These are server-side failures, not client mistakes.">
+                errors
+              </MetricExplainer>
+            </th>
+            <th className="num">
+              <MetricExplainer label="p50" explanation="The typical request. Half are faster than this, half slower.">
+                p50
+              </MetricExplainer>
+            </th>
+            <th className="num">
+              <MetricExplainer label="p95" explanation="1 in 20 requests is slower than this. This is closer to what your worst-served users feel.">
+                p95
+              </MetricExplainer>
+            </th>
+            <th className="num">
+              <MetricExplainer label="p99" explanation="1 in 100 requests is slower than this. The rare tail, often a cold cache or a missing index.">
+                p99
+              </MetricExplainer>
+            </th>
             <th>trend</th>
             <th>n+1</th>
           </tr>

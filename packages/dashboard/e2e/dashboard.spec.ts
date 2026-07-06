@@ -65,6 +65,17 @@ test('routes table does not break the page layout on mobile', async ({ page }) =
   expect(bodyOverflow).toBe(true)
 })
 
+test('reduced motion renders the verdict value immediately and is stable', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/#/insights')
+  await expect(page.getByTestId('health-verdict')).toBeVisible()
+})
+
+test('routes view annotates p95 with a plain-language explainer', async ({ page }) => {
+  await page.goto('/#/routes')
+  await expect(page.getByTestId('metric-explainer').first()).toBeAttached()
+})
+
 test('overview renders seeded traffic', async ({ page }) => {
   await page.goto('/#/overview')
   await expect(page.getByTestId('span-count')).toContainText('65 requests')

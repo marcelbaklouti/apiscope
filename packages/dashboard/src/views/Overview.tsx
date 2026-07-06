@@ -1,5 +1,6 @@
 import { useDashboardStore } from '../lib/store'
 import { Link } from '../lib/router'
+import { MetricExplainer } from '../components/MetricExplainer'
 
 export function Overview() {
   const spans = useDashboardStore((state) => state.spans)
@@ -26,7 +27,13 @@ export function Overview() {
       <section className="card">
         <h2>traffic</h2>
         <p className="metric" data-testid="span-count">
-          {spans.length} requests buffered, {errorCount} server errors
+          {spans.length} requests buffered,{' '}
+          <MetricExplainer
+            label="server errors"
+            explanation="Share of recent requests that failed with a 5xx status. Anything above zero is worth a look."
+          >
+            {errorCount} server errors
+          </MetricExplainer>
         </p>
         <table>
           <tbody>

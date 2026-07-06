@@ -2,7 +2,26 @@ import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { useHashRoute } from '../lib/router'
 import { useDashboardStore } from '../lib/store'
+import { MetricExplainer } from '../components/MetricExplainer'
 import type { Child, NPlusOneGroup, Span, SpanDetail } from '../lib/types'
+
+function payloadBytes(payload: Span['response']): number | null {
+  if (payload === undefined) return null
+  const declared = payload.headers['content-length'] ?? payload.headers['Content-Length']
+  if (declared !== undefined) {
+    const parsed = Number(declared)
+    if (Number.isInteger(parsed) && parsed >= 0) return parsed
+  }
+  if (payload.body !== undefined) return payload.body.length
+  return null
+}
+
+function humanizeBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  const kilobytes = bytes / 1024
+  if (kilobytes < 1024) return `${Math.round(kilobytes)} KB`
+  return `${(kilobytes / 1024).toFixed(1)} MB`
+}
 
 function waterfallRowLabel(child: Child): string {
   return child.kind === 'db' ? `${child.system} · ${child.statement}` : `${child.method} ${child.url}`
@@ -87,10 +106,21 @@ function NPlusOneBanner({ groups }: { groups: NPlusOneGroup[] }) {
 
 function PayloadCard({ title, payload }: { title: string; payload: Span['request'] }) {
   if (payload === undefined) return null
+  const bytes = title === 'response' ? payloadBytes(payload) : null
   return (
     <section className="card">
       <h3>
         {title}
+        {bytes !== null && (
+          <span className="metric" style={{ color: 'var(--text-dim)', marginLeft: 8 }}>
+            <MetricExplainer
+              label="payload size"
+              explanation="Bytes sent back to the client. Large text bodies without compression cost users download time; consider gzip or trimming fields."
+            >
+              {humanizeBytes(bytes)}
+            </MetricExplainer>
+          </span>
+        )}
         {payload.redactedHeaders.length > 0 && (
           <span className="metric" style={{ color: 'var(--status-4xx)', marginLeft: 8 }}>
             {payload.redactedHeaders.length} redacted

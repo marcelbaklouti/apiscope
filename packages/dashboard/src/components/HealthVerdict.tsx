@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Finding } from '../lib/types'
+import { useCountUp } from '../lib/useCountUp'
 
 export interface HealthVerdictProps {
   findings: Finding[]
@@ -47,6 +48,7 @@ export function HealthVerdict(props: HealthVerdictProps): ReactNode {
   const { findings, windowSampleSize, topStats } = props
   const verdictTone = tone(findings)
   const share = affectedShare(findings, windowSampleSize)
+  const sharePct = useCountUp(share === null ? 0 : Math.round(share * 100))
   const criticals = findings.filter((finding) => finding.severity === 'critical').length
   const warnings = findings.filter((finding) => finding.severity === 'warning').length
   const advisories = findings.filter((finding) => finding.severity === 'advisory').length
@@ -67,7 +69,7 @@ export function HealthVerdict(props: HealthVerdictProps): ReactNode {
           <p className="verdict-sub">
             {share !== null ? (
               <>
-                Touching up to <span className="mono">{Math.round(share * 100)}%</span> of your recent
+                Touching up to <span className="mono">{Math.round(sharePct)}%</span> of your recent
                 traffic
               </>
             ) : (
