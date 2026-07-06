@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { verify as verifyPassword } from 'argon2'
+import { hash as hashPassword, verify as verifyPassword } from 'argon2'
 import { parseCookie, stringifySetCookie } from 'cookie'
 import * as openidClient from 'openid-client'
 import { createPendingStateStore } from './pending-state'
@@ -24,7 +24,7 @@ export type DashboardAuthConfig =
   | { mode: 'none' }
   | { mode: 'password'; sessionSecret: string; users: Array<{ username: string; passwordHash: string; displayName?: string }> }
   | { mode: 'oidc'; sessionSecret: string; issuer: string; clientId: string; clientSecret: string; redirectUri: string }
-  | { mode: 'proxy'; userHeader: string; nameHeader?: string }
+  | { mode: 'proxy'; userHeader: string; nameHeader?: string; trustedProxies?: string[] }
 
 const sessionCookieName = 'apiscope_session'
 const sessionTtlSeconds = 60 * 60 * 12
@@ -35,6 +35,17 @@ function headerValue(request: IncomingMessage, name: string): string | null {
   const value = request.headers[name]
   if (value === undefined) return null
   return Array.isArray(value) ? (value[0] ?? null) : value
+}
+
+function normalizeIpv4Mapped(address: string): string {
+  const mappedPrefix = '::ffff:'
+  return address.toLowerCase().startsWith(mappedPrefix) ? address.slice(mappedPrefix.length) : address
+}
+
+function isTrustedProxy(remoteAddress: string | undefined, trustedProxies: string[]): boolean {
+  if (remoteAddress === undefined) return false
+  const normalizedRemote = normalizeIpv4Mapped(remoteAddress)
+  return trustedProxies.some((trusted) => trusted === remoteAddress || normalizeIpv4Mapped(trusted) === normalizedRemote)
 }
 
 function readSessionToken(request: IncomingMessage): string | null {
@@ -80,8 +91,10 @@ export async function createDashboardAuthenticator(config: DashboardAuthConfig):
   }
 
   if (config.mode === 'proxy') {
+    const trustedProxies = config.trustedProxies ?? []
     return {
       async authenticate(request) {
+        if (!isTrustedProxy(request.socket.remoteAddress, trustedProxies)) return null
         const subject = headerValue(request, config.userHeader.toLowerCase())
         if (subject === null) return null
         const displayName = config.nameHeader === undefined ? subject : (headerValue(request, config.nameHeader.toLowerCase()) ?? subject)
@@ -97,12 +110,14 @@ export async function createDashboardAuthenticator(config: DashboardAuthConfig):
   const routes = new Map<string, RouteHandler>()
 
   if (config.mode === 'password') {
+    const dummyPasswordHash = await hashPassword(randomUUID())
     routes.set('POST /auth/login', async (request, response) => {
       const body = await readJsonBody(request)
       const username = typeof body['username'] === 'string' ? body['username'] : ''
       const password = typeof body['password'] === 'string' ? body['password'] : ''
       const user = config.users.find((entry) => entry.username === username)
-      const ok = user !== undefined && (await verifyPassword(user.passwordHash, password))
+      const passwordMatches = await verifyPassword(user?.passwordHash ?? dummyPasswordHash, password)
+      const ok = user !== undefined && passwordMatches
       if (!ok || user === undefined) {
         response.writeHead(401, { 'content-type': 'application/json' })
         response.end(JSON.stringify({ error: 'invalid-credentials' }))
