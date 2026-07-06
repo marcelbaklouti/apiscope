@@ -27,11 +27,26 @@
   --surface-card-hover: #17171b;
   --surface-inset: #0f0f12;
 
+  --surface-1: #101013;
+  --surface-2: #16161a;
+  --surface-3: #1c1c21;
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(0, 0, 0, 0.28);
+  --elevation-2: 0 10px 30px rgba(0, 0, 0, 0.42), 0 2px 8px rgba(0, 0, 0, 0.3);
+
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --dur-press: 140ms;
   --dur-expand: 240ms;
   --dur-enter: 420ms;
+
+  --motion-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --motion-duration-fast: 140ms;
+  --motion-duration-base: 240ms;
+  --motion-duration-slow: 420ms;
+  --motion-stagger: 45ms;
+
+  --nav-height: 40px;
+  --mobile-nav-height: 58px;
 
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
@@ -79,4 +94,19 @@
   --surface-card: #ffffff;
   --surface-card-hover: #faf9f6;
   --surface-inset: #f1efeb;
+
+  --surface-1: #fbfaf7;
+  --surface-2: #ffffff;
+  --surface-3: #ffffff;
+  --elevation-1: 0 1px 2px rgba(60, 54, 42, 0.08), 0 1px 1px rgba(60, 54, 42, 0.05);
+  --elevation-2: 0 12px 32px rgba(60, 54, 42, 0.12), 0 2px 8px rgba(60, 54, 42, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-fast: 0ms;
+    --motion-duration-base: 0ms;
+    --motion-duration-slow: 0ms;
+    --motion-stagger: 0ms;
+  }
 }

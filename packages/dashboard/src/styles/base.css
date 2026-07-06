@@ -232,8 +232,9 @@ main {
 
 .card {
   border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-raised);
+  border-radius: 6px;
+  background: var(--surface-2);
+  box-shadow: var(--elevation-1);
   padding: var(--space-3);
 }
 
@@ -321,8 +322,9 @@ main {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  background: linear-gradient(180deg, var(--surface-card), var(--surface-sunken));
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--surface-3), var(--surface-sunken));
+  box-shadow: var(--elevation-2);
   padding: var(--space-8) var(--space-8) var(--space-6);
   display: grid;
   grid-template-columns: 1fr;
@@ -554,7 +556,8 @@ main {
   position: relative;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface-card);
+  background: var(--surface-2);
+  box-shadow: var(--elevation-1);
   overflow: hidden;
   --sv: var(--text-dim);
   --sv-surface: transparent;
