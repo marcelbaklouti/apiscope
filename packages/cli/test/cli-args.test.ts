@@ -67,4 +67,22 @@ describe('parseCliArgs', () => {
       out: './apiscope.config.ts'
     })
   })
+
+  it('parses mcp with http and port', () => {
+    expect(parseCliArgs(['mcp', '--http', '--port', '7000'])).toEqual({
+      command: 'mcp',
+      http: true,
+      port: 7000,
+      collectorUrl: null
+    })
+  })
+
+  it('parses mcp defaulting to stdio', () => {
+    expect(parseCliArgs(['mcp'])).toEqual({
+      command: 'mcp',
+      http: false,
+      port: null,
+      collectorUrl: null
+    })
+  })
 })

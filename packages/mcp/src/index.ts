@@ -1,3 +1,6 @@
 export { createCollectorClient } from './client'
 export type { CollectorClient, GenerateScenarioParams, QuerySpansParams, StartLoadRunBody } from './client'
 export { createMcpServer } from './server'
+export { startStdioServer } from './stdio'
+export { startHttpServer } from './http'
+export type { HttpServerHandle, HttpServerOptions } from './http'

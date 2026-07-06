@@ -18,6 +18,7 @@ import {
   type SpanStore,
   type StorageConfig
 } from '@apiscope/collector'
+import { createCollectorClient, startHttpServer, startStdioServer } from '@apiscope/mcp'
 import { runCi } from './ci'
 import { ConfigError, loadConfig, type ApiscopeConfig, type OtlpConfig, type ProductionConfig } from './config'
 import { generateScenarioCommand } from './generate-scenario'
@@ -28,6 +29,7 @@ export type CliInvocation =
   | { command: 'serve'; configPath: string | null }
   | { command: 'ci'; configPath: string | null; updateBaseline: boolean; jsonPath?: string; junitPath?: string }
   | { command: 'generate-scenario'; configPath: string | null; window: string; baseUrl: string; shape: 'steady' | 'ramp'; out: string }
+  | { command: 'mcp'; http: boolean; port: number | null; collectorUrl: string | null }
   | { command: 'help' }
 
 const defaultGenerateScenarioWindow = '5m'
@@ -46,6 +48,9 @@ export function parseCliArgs(argv: string[]): CliInvocation {
       'base-url': { type: 'string' },
       shape: { type: 'string' },
       out: { type: 'string' },
+      http: { type: 'boolean', default: false },
+      port: { type: 'string' },
+      collector: { type: 'string' },
       help: { type: 'boolean', default: false }
     }
   })
@@ -74,6 +79,14 @@ export function parseCliArgs(argv: string[]): CliInvocation {
       out: values.out ?? defaultGenerateScenarioOut
     }
   }
+  if (command === 'mcp') {
+    return {
+      command: 'mcp',
+      http: values.http === true,
+      port: values.port === undefined ? null : Number(values.port),
+      collectorUrl: values.collector ?? null
+    }
+  }
   return { command: 'help' }
 }
 
@@ -90,6 +103,10 @@ usage:
     --window duration                   how far back to look, e.g. 5m (default 5m)
     --shape steady|ramp                 load shape (default steady)
     --out path                          config file to write (default ./apiscope.config.ts)
+  apiscope mcp [--http] [--port n] [--collector url]   run the mcp server for coding agents
+    --http                               serve over streamable http instead of stdio
+    --port n                             http port (default 0, an ephemeral port)
+    --collector url                      collector base url (default from config or APISCOPE_COLLECTOR_URL)
   apiscope --help
 `
 
@@ -261,6 +278,32 @@ async function runServe(configPath: string | null): Promise<void> {
   await startCollectorServer(configPath, { defaultHost: '0.0.0.0', announce: 'prod' })
 }
 
+async function resolveCollectorUrl(collectorUrl: string | null, cwd: string): Promise<string> {
+  if (collectorUrl !== null) return collectorUrl
+  if (process.env.APISCOPE_COLLECTOR_URL !== undefined) return process.env.APISCOPE_COLLECTOR_URL
+  const config = await resolveConfig(null, cwd)
+  const host = config.collector?.host ?? '127.0.0.1'
+  const port = config.collector?.port ?? 4620
+  return `http://${host}:${port}`
+}
+
+async function runMcp(invocation: Extract<CliInvocation, { command: 'mcp' }>): Promise<void> {
+  const collectorUrl = await resolveCollectorUrl(invocation.collectorUrl, process.cwd())
+  const client = createCollectorClient(collectorUrl)
+  if (invocation.http) {
+    const handle = await startHttpServer(client, { port: invocation.port ?? 0 })
+    console.log(`apiscope mcp server listening on http://127.0.0.1:${handle.port}`)
+    const stop = async () => {
+      await handle.close()
+      process.exit(0)
+    }
+    process.on('SIGINT', () => void stop())
+    process.on('SIGTERM', () => void stop())
+    return
+  }
+  await startStdioServer(client)
+}
+
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   const invocation = parseCliArgs(argv)
   if (invocation.command === 'help') {
@@ -278,6 +321,10 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     }
     if (invocation.command === 'generate-scenario') {
       await generateScenarioCommand(invocation, process.cwd())
+      return
+    }
+    if (invocation.command === 'mcp') {
+      await runMcp(invocation)
       return
     }
     const cwd = process.cwd()

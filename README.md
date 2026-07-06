@@ -120,6 +120,7 @@ apiscope ci --json report.json --junit report.xml
 | `@apiscope/load` | Coordinated-omission-safe load engine for apiscope |
 | `@apiscope/cli` | apiscope CLI: dev collector and CI budgets |
 | `@apiscope/dashboard` | apiscope dashboard UI |
+| `@apiscope/mcp` | MCP server exposing apiscope's collector API as tools for coding agents |
 
 ## License
 
