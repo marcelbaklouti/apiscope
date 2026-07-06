@@ -119,8 +119,9 @@ apiscope ci --json report.json --junit report.xml
 | `@apiscope/next` | Next.js adapter for apiscope |
 | `@apiscope/hono` | Hono adapter for apiscope (Node, Bun, Deno, Edge) |
 | `@apiscope/load` | Coordinated-omission-safe load engine for apiscope |
+| `@apiscope/advisor` | Pure-function advisor rules that turn captured traffic into paste-ready fixes |
 | `@apiscope/cli` | apiscope CLI: dev collector and CI budgets |
-| `@apiscope/dashboard` | apiscope dashboard UI |
+| `@apiscope/dashboard` | apiscope dashboard UI, including the mobile-first Insights hub |
 | `@apiscope/mcp` | MCP server exposing apiscope's collector API as tools for coding agents |
 
 ## License
