@@ -54,7 +54,7 @@ export function scenarioConfigModule(generated: GeneratedScenario): string {
     null,
     2
   )
-  return `import { defineConfig } from '@apiscope/cli'
+  return `import { defineConfig } from 'apiscope'
 
 export default defineConfig({
   ci: {

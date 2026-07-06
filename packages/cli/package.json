@@ -1,8 +1,8 @@
 {
-  "name": "@apiscope/cli",
+  "name": "apiscope",
   "version": "0.1.0",
   "license": "MIT",
-  "description": "apiscope CLI: dev collector and CI budgets",
+  "description": "apiscope CLI: dev collector, dashboard, load testing and CI budgets for JavaScript APIs",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/marcelbaklouti/apiscope.git",
