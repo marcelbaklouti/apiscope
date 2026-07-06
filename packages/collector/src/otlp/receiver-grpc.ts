@@ -1,7 +1,9 @@
-import { loadPackageDefinition, Server, ServerCredentials, type handleUnaryCall, type ServiceClientConstructor } from '@grpc/grpc-js'
+import { loadPackageDefinition, Server, ServerCredentials, status, type handleUnaryCall, type Metadata, type ServiceClientConstructor } from '@grpc/grpc-js'
 import { loadSync } from '@grpc/proto-loader'
+import type { IncomingMessage } from 'node:http'
 import { join } from 'node:path'
 import type { ChildSpan, RequestSpan } from '@apiscope/core'
+import type { IngestAuthenticator } from '../auth/ingest-auth'
 import { exportRequestToSpans, type OtlpExportTraceServiceRequest, type OtlpKeyValue, type OtlpResourceSpans } from './mapping'
 import { protoRootDirectory } from './proto'
 
@@ -9,7 +11,17 @@ export interface OtlpGrpcServerDeps {
   port: number
   host: string
   appName?: string
+  ingestAuth?: IngestAuthenticator
   ingest(appName: string, spans: RequestSpan[], childSpans: ChildSpan[]): Promise<void>
+}
+
+function requestFromMetadata(metadata: Metadata): IncomingMessage {
+  const authorization = metadata.get('authorization')[0]
+  const legacyToken = metadata.get('x-apiscope-token')[0]
+  const headers: Record<string, string> = {}
+  if (typeof authorization === 'string') headers['authorization'] = authorization
+  if (typeof legacyToken === 'string') headers['x-apiscope-token'] = legacyToken
+  return { headers } as unknown as IncomingMessage
 }
 
 export interface OtlpGrpcServer {
@@ -105,9 +117,18 @@ export function createOtlpGrpcServer(deps: OtlpGrpcServerDeps): OtlpGrpcServer {
   const TraceServiceDefinition = packageDefinition.opentelemetry.proto.collector.trace.v1.TraceService
   const server = new Server()
   const exportHandler: handleUnaryCall<DecodedExportTraceServiceRequest, Record<string, never>> = (call, callback) => {
+    let boundAppName: string | undefined
+    if (deps.ingestAuth !== undefined) {
+      const identity = deps.ingestAuth.authenticate(requestFromMetadata(call.metadata))
+      if (identity === null) {
+        callback({ code: status.UNAUTHENTICATED, message: 'unauthorized', name: 'Error' })
+        return
+      }
+      if (identity.appName !== '') boundAppName = identity.appName
+    }
     const decoded = call.request
     const exportRequest = toPlainExportRequest(decoded)
-    const groups = groupByAppName(exportRequest, fallbackAppName)
+    const groups = boundAppName === undefined ? groupByAppName(exportRequest, fallbackAppName) : new Map([[boundAppName, exportRequest]])
     void (async () => {
       for (const [appName, grouped] of groups) {
         const { spans, childSpans } = exportRequestToSpans(grouped)

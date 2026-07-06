@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createTokenIngestAuthenticator } from '../src/auth/ingest-auth'
 import { createCollector, type Collector } from '../src/index'
 import { spansToExportRequest } from '../src/otlp/mapping'
 import { encodeExportRequest } from '../src/otlp/proto'
@@ -61,5 +62,51 @@ describe('otlp http receiver', () => {
     const { port } = await collector.listen()
     const response = await fetch(`http://127.0.0.1:${port}/v1/traces`, { method: 'POST', body: '{}' })
     expect(response.status).toBe(404)
+  })
+
+  it('ingests under the authenticated app, not the client-declared service.name', async () => {
+    const ingestAuth = createTokenIngestAuthenticator([{ appName: 'app-a', token: 'app-a-token' }])
+    collector = createCollector({ dbPath: ':memory:', port: 0, ingestAuth, otlpIngest: { http: true } })
+    const { port } = await collector.listen()
+    const publishedAppNames: string[] = []
+    collector.hub.subscribe((event) => {
+      if (event.type === 'spans') publishedAppNames.push(event.appName)
+    })
+    const spoofingRequest = spansToExportRequest(
+      [
+        {
+          id: 'cccccccccccccccc',
+          traceId: 'dddddddddddddddddddddddddddddddd',
+          method: 'GET',
+          routePattern: '/spoofed',
+          actualPath: '/spoofed',
+          statusCode: 200,
+          timing: { start: 1_700_000_000_000, ttfb: null, duration: 7 },
+          framework: 'otlp',
+          runtime: 'node'
+        }
+      ],
+      [],
+      { serviceName: 'app-b' }
+    )
+    const response = await fetch(`http://127.0.0.1:${port}/v1/traces`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer app-a-token' },
+      body: JSON.stringify(spoofingRequest)
+    })
+    expect(response.status).toBe(200)
+    await vi.waitFor(() => expect(publishedAppNames).toEqual(['app-a']), { timeout: 2000 })
+  })
+
+  it('rejects an OTLP HTTP export with no token when a token authenticator is configured', async () => {
+    const ingestAuth = createTokenIngestAuthenticator([{ appName: 'app-a', token: 'app-a-token' }])
+    collector = createCollector({ dbPath: ':memory:', port: 0, ingestAuth, otlpIngest: { http: true } })
+    const { port } = await collector.listen()
+    const response = await fetch(`http://127.0.0.1:${port}/v1/traces`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request)
+    })
+    expect(response.status).toBe(401)
   })
 })

@@ -33,9 +33,14 @@ export function createOtlpHttpHandler(deps: OtlpHttpHandlerDeps): DynamicHandler
   const fallbackAppName = deps.appName ?? 'otlp'
   return async (request, response, url) => {
     if (request.method !== 'POST' || url.pathname !== '/v1/traces') return false
-    if (deps.ingestAuth !== undefined && deps.ingestAuth.authenticate(request) === null) {
-      sendJson(response, 401, { error: 'unauthorized' })
-      return true
+    let boundAppName: string | undefined
+    if (deps.ingestAuth !== undefined) {
+      const identity = deps.ingestAuth.authenticate(request)
+      if (identity === null) {
+        sendJson(response, 401, { error: 'unauthorized' })
+        return true
+      }
+      if (identity.appName !== '') boundAppName = identity.appName
     }
     const contentType = request.headers['content-type'] ?? ''
     const raw = await readRawBody(request)
@@ -50,7 +55,7 @@ export function createOtlpHttpHandler(deps: OtlpHttpHandlerDeps): DynamicHandler
       sendJson(response, 400, { error: 'invalid otlp export request' })
       return true
     }
-    const groups = groupByAppName(exportRequest, fallbackAppName)
+    const groups = boundAppName === undefined ? groupByAppName(exportRequest, fallbackAppName) : new Map([[boundAppName, exportRequest]])
     for (const [appName, grouped] of groups) {
       const { spans, childSpans } = exportRequestToSpans(grouped)
       await deps.ingest(appName, spans, childSpans)

@@ -349,6 +349,7 @@ export function createCollector(options: CollectorOptions): Collector {
           host,
           port: options.otlpIngest.grpcPort ?? 4317,
           appName: options.otlpIngest.appName ?? 'otlp',
+          ingestAuth,
           ingest: (appName, spans, childSpans) => processor.ingestSpans(appName, spans, childSpans)
         })
       : null
