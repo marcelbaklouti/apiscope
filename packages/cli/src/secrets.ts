@@ -10,6 +10,7 @@ export function resolveSecret(ref: string): string {
   if (ref.startsWith('file:')) {
     return readFileSync(ref.slice(5), 'utf8').trim()
   }
+  console.warn('apiscope: a secret is configured as a plaintext literal in apiscope.config.ts; prefer env: or file: references')
   return ref
 }
 

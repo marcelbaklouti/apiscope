@@ -103,6 +103,7 @@ apiscope ci --json report.json --junit report.xml
 - Payload redaction on by default
 - Collector bound to 127.0.0.1 — never exposed beyond localhost
 - Zero telemetry
+- `GET /metrics` is intentionally exempt from dashboard auth, matching standard Prometheus scrape conventions (Prometheus can't present a session cookie) — network-restrict it in production the same way you would any other unauthenticated scrape endpoint
 
 ## Packages
 
