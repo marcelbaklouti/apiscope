@@ -102,4 +102,28 @@ describe('loadConfig', () => {
     `)
     await expect(loadConfig(configPath)).rejects.toThrow(/otlp\.export\.protocol/)
   })
+
+  it('accepts an advisor block with thresholds and rule overrides', async () => {
+    const configPath = writeConfig(`
+      const config = {
+        advisor: {
+          enabled: true,
+          minimumOverallSampleSize: 30,
+          thresholds: { slowRouteP95Ms: 300, errorRateCritical: 0.2 },
+          rules: { 'slow-route': { minimumSampleSize: 50, enabled: false } }
+        }
+      }
+      export default config
+    `)
+    const config = await loadConfig(configPath)
+    expect(config.advisor?.thresholds?.slowRouteP95Ms).toBe(300)
+    expect(config.advisor?.rules?.['slow-route']?.enabled).toBe(false)
+  })
+
+  it('rejects an advisor threshold of the wrong type', async () => {
+    const configPath = writeConfig(`
+      export default { advisor: { thresholds: { slowRouteP95Ms: 'fast' } } }
+    `)
+    await expect(loadConfig(configPath)).rejects.toThrow(/advisor/)
+  })
 })

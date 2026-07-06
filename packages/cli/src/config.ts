@@ -124,6 +124,29 @@ const otlpSchema = z
   })
   .optional()
 
+const advisorSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    minimumOverallSampleSize: z.number().int().positive().optional(),
+    thresholds: z
+      .object({
+        compressibleMinBytes: z.number().positive().optional(),
+        oversizedPayloadBytes: z.number().positive().optional(),
+        slowRouteP95Ms: z.number().positive().optional(),
+        criticalRouteP95Ms: z.number().positive().optional(),
+        unstableLatencyRatio: z.number().positive().optional(),
+        errorRateWarning: z.number().min(0).max(1).optional(),
+        errorRateCritical: z.number().min(0).max(1).optional(),
+        slowDependencyShare: z.number().min(0).max(1).optional(),
+        sequentialOutboundMinMs: z.number().nonnegative().optional()
+      })
+      .optional(),
+    rules: z
+      .record(z.string(), z.object({ minimumSampleSize: z.number().int().positive().optional(), enabled: z.boolean().optional() }))
+      .optional()
+  })
+  .optional()
+
 const configSchema = z.object({
   collector: z
     .object({
@@ -155,7 +178,8 @@ const configSchema = z.object({
     })
     .optional(),
   production: productionSchema,
-  otlp: otlpSchema
+  otlp: otlpSchema,
+  advisor: advisorSchema
 })
 
 export type IngestAuthConfig = { mode: 'none' } | { mode: 'token'; tokens: Array<{ appName: string; token: string }> }
@@ -199,6 +223,25 @@ export interface OtlpConfig {
   ingest?: OtlpIngestConfigInput
 }
 
+export interface AdvisorConfigThresholds {
+  compressibleMinBytes?: number
+  oversizedPayloadBytes?: number
+  slowRouteP95Ms?: number
+  criticalRouteP95Ms?: number
+  unstableLatencyRatio?: number
+  errorRateWarning?: number
+  errorRateCritical?: number
+  slowDependencyShare?: number
+  sequentialOutboundMinMs?: number
+}
+
+export interface AdvisorConfigShape {
+  enabled?: boolean
+  minimumOverallSampleSize?: number
+  thresholds?: AdvisorConfigThresholds
+  rules?: Record<string, { minimumSampleSize?: number; enabled?: boolean }>
+}
+
 export interface ApiscopeConfig {
   collector?: { host?: string; port?: number; dbPath?: string; retentionRows?: number; storage?: StorageConfig }
   ci?: {
@@ -210,6 +253,7 @@ export interface ApiscopeConfig {
   }
   production?: ProductionConfig
   otlp?: OtlpConfig
+  advisor?: AdvisorConfigShape
 }
 
 export class ConfigError extends Error {}
