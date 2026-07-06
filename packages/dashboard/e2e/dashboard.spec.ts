@@ -1,13 +1,63 @@
 import { expect, test } from '@playwright/test'
 
-test('overview renders seeded traffic', async ({ page }) => {
+test('insights hub is the landing view and shows the health verdict', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByTestId('span-count')).toContainText('40 requests')
+  await expect(page.getByTestId('health-verdict')).toBeVisible()
+  await expect(page.getByTestId('insights-list')).toBeVisible()
+})
+
+test('a finding expands to reveal a paste-ready fix and evidence deep-link', async ({ page }) => {
+  await page.goto('/#/insights')
+  const firstToggle = page.getByTestId('finding-toggle').first()
+  await firstToggle.click()
+  await expect(page.getByTestId('finding-snippet').first()).toBeVisible()
+  const evidence = page.getByTestId('finding-evidence').first()
+  await expect(evidence).toHaveAttribute('href', /#\//)
+})
+
+test('copy-fix writes the snippet and confirms', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.goto('/#/insights')
+  await page.getByTestId('finding-toggle').first().click()
+  await page.getByTestId('finding-copy').first().click()
+  await expect(page.getByTestId('finding-copied').first()).toBeVisible()
+})
+
+test('the evidence deep-link navigates into the pre-filtered expert view', async ({ page }) => {
+  await page.goto('/#/insights')
+  await page.getByTestId('finding-toggle').first().click()
+  await page.getByTestId('finding-evidence').first().click()
+  await expect(page).toHaveURL(/#\/(routes|inspector)/)
+})
+
+test('dismissing a finding removes its card and offers restore', async ({ page }) => {
+  await page.goto('/#/insights')
+  await expect(page.getByTestId('insights-list')).toBeVisible()
+  const before = await page.getByTestId('finding-title').count()
+  await page.getByTestId('finding-dismiss').first().click()
+  await expect(page.getByTestId('finding-title')).toHaveCount(before - 1)
+  await expect(page.getByTestId('insights-restore')).toBeVisible()
+})
+
+test('insufficient-data state before enough traffic', async ({ page }) => {
+  await page.goto('http://127.0.0.1:4656/#/insights')
+  await expect(page.getByTestId('insights-insufficient')).toBeVisible()
+})
+
+test('all-clear empty state lists what was checked', async ({ page }) => {
+  await page.goto('http://127.0.0.1:4657/#/insights')
+  await expect(page.getByTestId('insights-empty')).toBeVisible()
+  await expect(page.getByTestId('insights-checked')).toBeVisible()
+})
+
+test('overview renders seeded traffic', async ({ page }) => {
+  await page.goto('/#/overview')
+  await expect(page.getByTestId('span-count')).toContainText('65 requests')
   await expect(page.getByTestId('latency-strip')).toBeVisible()
 })
 
 test('overview visual snapshot dark and light', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/#/overview')
   await expect(page.getByTestId('span-count')).toBeVisible()
   await expect(page).toHaveScreenshot('overview-dark.png')
   await page.getByRole('button', { name: 'toggle theme' }).click()

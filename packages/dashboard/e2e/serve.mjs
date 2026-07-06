@@ -14,10 +14,17 @@ await collector.listen()
 
 await collector.store.replaceRoutes('seed-app', [
   { method: 'GET', pattern: '/api/users/:id', sourceFile: 'app/api/users/[id]/route.ts' },
-  { method: 'POST', pattern: '/api/orders' }
+  { method: 'POST', pattern: '/api/orders' },
+  { method: 'GET', pattern: '/api/report', sourceFile: 'app/api/report/route.ts' }
 ])
 
 const now = Date.now()
+const uncompressedJsonResponse = {
+  headers: { 'content-type': 'application/json', 'content-length': '30000' },
+  truncated: false,
+  redactedHeaders: []
+}
+
 const spans = Array.from({ length: 40 }, (unused, index) => ({
   id: `seed-${index}`,
   traceId: `trace-${index}`,
@@ -33,6 +40,24 @@ const spans = Array.from({ length: 40 }, (unused, index) => ({
     headers: { accept: 'application/json', authorization: '[redacted]' },
     truncated: false,
     redactedHeaders: ['authorization']
+  },
+  ...(index % 4 === 3 ? {} : { response: { ...uncompressedJsonResponse } })
+}))
+
+const reportSpans = Array.from({ length: 25 }, (unused, index) => ({
+  id: `seed-report-${index}`,
+  traceId: `trace-report-${index}`,
+  method: 'GET',
+  routePattern: '/api/report',
+  actualPath: '/api/report',
+  statusCode: 200,
+  timing: { start: now - index * 700, ttfb: 40, duration: 600 + (index % 8) * 25 },
+  framework: 'express',
+  runtime: 'node',
+  request: {
+    headers: { accept: 'application/json' },
+    truncated: false,
+    redactedHeaders: []
   }
 }))
 
@@ -50,7 +75,7 @@ const nPlusOneChildSpans = Array.from({ length: 6 }, (unused, index) => ({
 }))
 
 await collector.store.insertBatch('seed-app', {
-  spans,
+  spans: [...spans, ...reportSpans],
   childSpans: [
     {
       id: 'seed-child-1',
@@ -78,4 +103,4 @@ await collector.store.insertBatch('seed-app', {
   ]
 })
 
-console.log('seeded collector on 4655')
+console.log('seeded collector on 4655 with 65 spans')

@@ -585,6 +585,13 @@ main {
 .finding-head {
   display: grid;
   grid-template-columns: 3px 1fr auto;
+  align-items: stretch;
+  width: 100%;
+}
+
+.finding-toggle-btn {
+  display: grid;
+  grid-template-columns: 1fr auto;
   gap: var(--space-4);
   align-items: start;
   width: 100%;
@@ -592,11 +599,11 @@ main {
   background: transparent;
   border: none;
   border-radius: 0;
-  padding: var(--space-4) var(--space-4) var(--space-4) 0;
+  padding: var(--space-4) var(--space-2) var(--space-4) var(--space-4);
   cursor: pointer;
 }
 
-.finding-head:hover {
+.finding-toggle-btn:hover {
   background: var(--surface-card-hover);
 }
 
@@ -757,16 +764,21 @@ main {
 }
 
 .finding-dismiss {
-  margin-left: auto;
+  align-self: start;
+  margin: var(--space-3) var(--space-3) 0 0;
   border: none;
   background: transparent;
   color: var(--text-dim);
-  font-size: var(--text-xs);
-  padding: var(--space-1) var(--space-2);
+  opacity: 0.5;
+  padding: var(--space-1);
+  border-radius: 4px;
+  display: inline-flex;
 }
 
 .finding-dismiss:hover {
   color: var(--text);
+  opacity: 1;
+  background: var(--surface-inset);
 }
 
 .insights-state {
@@ -845,14 +857,15 @@ main {
     animation-delay: calc(var(--stagger-index, 0) * 45ms);
   }
 
-  .finding-head,
+  .finding-toggle-btn,
   .finding-copy,
   .finding-dismiss {
     transition: background-color var(--dur-press) var(--ease-out), color var(--dur-press) var(--ease-out),
-      border-color var(--dur-press) var(--ease-out), transform var(--dur-press) var(--ease-out);
+      border-color var(--dur-press) var(--ease-out), opacity var(--dur-press) var(--ease-out),
+      transform var(--dur-press) var(--ease-out);
   }
 
-  .finding-head:active {
+  .finding-toggle-btn:active {
     transform: scale(0.994);
   }
 

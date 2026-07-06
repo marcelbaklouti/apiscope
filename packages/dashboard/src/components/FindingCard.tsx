@@ -77,40 +77,59 @@ export function FindingCard(props: FindingCardProps): ReactNode {
 
   return (
     <article className="finding" data-severity={finding.severity} data-expanded={expanded}>
-      <button
-        type="button"
-        className="finding-head"
-        data-testid="finding-toggle"
-        aria-expanded={expanded}
-        onClick={onToggle}
-      >
+      <div className="finding-head">
         <span className="finding-rail" aria-hidden="true" />
-        <span className="finding-head-main">
-          <span className="finding-chips">
-            <span
-              className="finding-chip finding-chip-severity"
-              data-testid="finding-severity"
-              data-severity={finding.severity}
-            >
-              {SEVERITY_LABEL[finding.severity]}
+        <button
+          type="button"
+          className="finding-toggle-btn"
+          data-testid="finding-toggle"
+          aria-expanded={expanded}
+          onClick={onToggle}
+        >
+          <span className="finding-head-main">
+            <span className="finding-chips">
+              <span
+                className="finding-chip finding-chip-severity"
+                data-testid="finding-severity"
+                data-severity={finding.severity}
+              >
+                {SEVERITY_LABEL[finding.severity]}
+              </span>
+              <span className="finding-chip finding-chip-category">{CATEGORY_LABEL[finding.category]}</span>
+              {routeLabel !== null && <span className="finding-route mono">{routeLabel}</span>}
             </span>
-            <span className="finding-chip finding-chip-category">{CATEGORY_LABEL[finding.category]}</span>
-            {routeLabel !== null && <span className="finding-route mono">{routeLabel}</span>}
+            <span className="finding-title" data-testid="finding-title">
+              {finding.title}
+            </span>
+            <span className="finding-why">{finding.whatAndWhy}</span>
+            <span className="finding-impact mono" data-testid="finding-impact">
+              {finding.impact.humanized}
+            </span>
           </span>
-          <span className="finding-title" data-testid="finding-title">
-            {finding.title}
+          <span className="finding-caret" aria-hidden="true" data-expanded={expanded}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path
+                d="M3.5 5.25 7 8.75l3.5-3.5"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </span>
-          <span className="finding-why">{finding.whatAndWhy}</span>
-          <span className="finding-impact mono" data-testid="finding-impact">
-            {finding.impact.humanized}
-          </span>
-        </span>
-        <span className="finding-caret" aria-hidden="true" data-expanded={expanded}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M3.5 5.25 7 8.75l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </button>
+        <button
+          type="button"
+          className="finding-dismiss"
+          data-testid="finding-dismiss"
+          aria-label="dismiss finding"
+          onClick={onDismiss}
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+            <path d="M3.2 3.2l6.6 6.6M9.8 3.2l-6.6 6.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
           </svg>
-        </span>
-      </button>
+        </button>
+      </div>
 
       {expanded && (
         <div className="finding-body">
@@ -131,7 +150,13 @@ export function FindingCard(props: FindingCardProps): ReactNode {
                 {copied ? (
                   <span data-testid="finding-copied" className="finding-copied">
                     <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                      <path d="M2.5 6.8 5 9.3l5.5-5.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path
+                        d="M2.5 6.8 5 9.3l5.5-5.6"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                     copied
                   </span>
@@ -156,7 +181,13 @@ export function FindingCard(props: FindingCardProps): ReactNode {
             >
               show me the evidence
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <path d="M3 9 9 3M9 3H4.5M9 3v4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M3 9 9 3M9 3H4.5M9 3v4.5"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </a>
             {finding.fix.docsUrl !== undefined && (
@@ -164,14 +195,6 @@ export function FindingCard(props: FindingCardProps): ReactNode {
                 docs
               </a>
             )}
-            <button
-              type="button"
-              className="finding-dismiss"
-              data-testid="finding-dismiss"
-              onClick={onDismiss}
-            >
-              dismiss
-            </button>
           </div>
         </div>
       )}
