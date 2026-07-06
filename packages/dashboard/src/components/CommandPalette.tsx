@@ -16,7 +16,8 @@ export function CommandPalette() {
 
   const commands = useMemo((): Command[] => {
     const views: Command[] = [
-      { label: 'go to overview', target: '/' },
+      { label: 'go to insights', target: '/insights' },
+      { label: 'go to overview', target: '/overview' },
       { label: 'go to routes', target: '/routes' },
       { label: 'go to inspector', target: '/inspector' },
       { label: 'go to load', target: '/load' },

@@ -4,6 +4,7 @@ import { useLiveConnection } from './lib/live'
 import { useDashboardStore } from './lib/store'
 import { LatencyStrip } from './components/LatencyStrip'
 import { CommandPalette } from './components/CommandPalette'
+import { Insights } from './views/Insights'
 import { Overview } from './views/Overview'
 import { Routes } from './views/Routes'
 import { Inspector } from './views/Inspector'
@@ -64,13 +65,17 @@ function DashboardShell() {
   const connected = useLiveConnection()
   const droppedTotal = useDashboardStore((state) => state.droppedTotal)
   const [theme, toggleTheme] = useTheme()
-  const view = segments[0] ?? 'overview'
+  const view = segments[0] ?? 'insights'
+  const insightsActive = view === 'insights' || segments.length === 0
   return (
     <div className="layout">
       <header className="topbar">
         <strong>apiscope</strong>
         <nav aria-label="views">
-          <Link to="/">Overview</Link>
+          <Link to="/insights" data-active={insightsActive}>
+            Insights
+          </Link>
+          <Link to="/overview">Overview</Link>
           <Link to="/routes">Routes</Link>
           <Link to="/inspector">Inspector</Link>
           <Link to="/flamegraph">Flamegraph</Link>
@@ -98,6 +103,7 @@ function DashboardShell() {
       )}
       <LatencyStrip theme={theme} />
       <main>
+        {view === 'insights' && <Insights />}
         {view === 'overview' && <Overview />}
         {view === 'routes' && <Routes />}
         {view === 'inspector' && segments[1] === 'run' && <Inspector spanId={segments[3] ?? null} loadRunId={segments[2] ?? null} />}
