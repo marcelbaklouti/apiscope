@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type RequestListener, type Server, type ServerResponse } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
+import type { AdvisorConfigInput } from '@apiscope/advisor'
 import type { DashboardAuthenticator } from './auth/dashboard-auth'
 import type { IngestAuthenticator } from './auth/ingest-auth'
 import type { LiveTransport } from './live/live-transport'
@@ -37,6 +38,7 @@ export interface CollectorOptions {
   allowInsecure?: boolean
   otlpExport?: OtlpExportConfig
   otlpIngest?: OtlpIngestOptions
+  advisor?: AdvisorConfigInput
 }
 
 export type RouteHandler = (request: IncomingMessage, response: ServerResponse, url: URL) => void | Promise<void>

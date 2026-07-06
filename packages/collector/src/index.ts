@@ -1,10 +1,12 @@
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
+import { resolveAdvisorConfig } from '@apiscope/advisor'
 import { generateScenario } from '@apiscope/load'
 import { buildDependencyGraph, type SpanWithChildren } from './analysis/dependencies'
 import { detectNPlusOne } from './analysis/nplusone'
 import { createDashboardAuthenticator, type DashboardAuthenticator } from './auth/dashboard-auth'
 import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/ingest-auth'
 import { IngestProcessor } from './ingest'
+import { computeInsights, resolveAdvisorConfigFromMeta } from './insights'
 import { InProcessLiveTransport } from './live-hub'
 import type { LiveTransport } from './live/live-transport'
 import { startLoadRun, type LoadRunRequest } from './load-runs'
@@ -182,6 +184,7 @@ export function createCollector(options: CollectorOptions): Collector {
   const profileResults = new ProfileResultStore()
   const ingestAuth = options.ingestAuth ?? createNoneIngestAuthenticator()
   const dashboardAuth = options.dashboardAuth ?? createInlineNoneDashboardAuthenticator()
+  const advisorConfig = options.advisor !== undefined ? resolveAdvisorConfig(options.advisor) : resolveAdvisorConfigFromMeta(options.meta)
   if (dashboardAuth.mode === 'none' && !isLoopbackHost(host) && options.allowInsecure !== true) {
     throw new Error('refusing to start: dashboard auth is "none" on a non-loopback host; set allowInsecure to override (insecure)')
   }
@@ -215,6 +218,27 @@ export function createCollector(options: CollectorOptions): Collector {
     sendJson(response, 200, withIndicator)
   })
   routes.set('GET /api/route-stats', async (request, response) => sendJson(response, 200, await store.routeStats()))
+  routes.set('GET /api/insights', async (request, response) => {
+    try {
+      const result = await computeInsights(store, advisorConfig)
+      sendJson(response, 200, {
+        findings: result.findings,
+        rulesRun: result.rulesRun,
+        insufficientData: result.insufficientData,
+        advisorEnabled: advisorConfig.enabled,
+        windowSampleSize: result.windowSampleSize
+      })
+    } catch {
+      sendJson(response, 200, {
+        findings: [],
+        rulesRun: [],
+        insufficientData: false,
+        advisorEnabled: advisorConfig.enabled,
+        error: 'analysis-failed',
+        windowSampleSize: 0
+      })
+    }
+  })
   routes.set('GET /api/scenario', async (request, response, url) => {
     const requestedWindowMs = Number(url.searchParams.get('windowMs') ?? String(SCENARIO_DEFAULT_WINDOW_MS))
     const windowMs = Number.isFinite(requestedWindowMs) && requestedWindowMs > 0 ? requestedWindowMs : SCENARIO_DEFAULT_WINDOW_MS

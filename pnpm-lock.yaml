@@ -140,6 +140,9 @@ importers:
 
   packages/collector:
     dependencies:
+      '@apiscope/advisor':
+        specifier: workspace:*
+        version: link:../advisor
       '@apiscope/core':
         specifier: workspace:*
         version: link:../core

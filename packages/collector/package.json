@@ -31,6 +31,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@apiscope/advisor": "workspace:*",
     "@apiscope/core": "workspace:*",
     "@apiscope/load": "workspace:*",
     "@grpc/grpc-js": "^1.14.4",
