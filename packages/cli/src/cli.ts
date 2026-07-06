@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
@@ -343,5 +343,14 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   }
 }
 
-const invokedDirectly = process.argv[1]?.endsWith('cli.js') === true || process.argv[1]?.endsWith('cli.cjs') === true
-if (invokedDirectly) void main()
+function invokedAsEntry(): boolean {
+  const entry = process.argv[1]
+  if (entry === undefined) return false
+  try {
+    const resolved = realpathSync(entry)
+    return resolved.endsWith('cli.js') || resolved.endsWith('cli.cjs')
+  } catch {
+    return entry.endsWith('cli.js') || entry.endsWith('cli.cjs')
+  }
+}
+if (invokedAsEntry()) void main()

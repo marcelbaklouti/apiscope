@@ -1,5 +1,11 @@
 # @apiscope/cli
 
+## 0.1.2
+
+### Patch Changes
+
+- Fix `npx apiscope` and globally-installed `apiscope` doing nothing. The CLI's entry-point guard only ran `main()` when the process was invoked as `cli.js`, but npx and global installs invoke it through a `.bin/apiscope` symlink, so `process.argv[1]` was `apiscope`, the guard was false, and the command exited silently. Resolve the symlink with `realpathSync` before checking, so the CLI runs however it is invoked.
+
 ## 0.1.1
 
 ### Patch Changes
