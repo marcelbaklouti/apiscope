@@ -126,4 +126,37 @@ describe('loadConfig', () => {
     `)
     await expect(loadConfig(configPath)).rejects.toThrow(/advisor/)
   })
+
+  it('rejects a dashboard sessionSecret shorter than 32 characters', async () => {
+    const configPath = writeConfig(`
+      export default {
+        production: {
+          dashboardAuth: { mode: 'password', sessionSecret: 'too-short', users: [] }
+        }
+      }
+    `)
+    await expect(loadConfig(configPath)).rejects.toThrow(/production\.dashboardAuth\.sessionSecret/)
+  })
+
+  it('accepts collector security seams and proxy trustedProxies', async () => {
+    const configPath = writeConfig(`
+      const config = {
+        collector: {
+          port: 4620,
+          loadAllowRemoteHosts: ['staging.internal'],
+          allowedOrigins: ['http://dash.internal'],
+          maxRequestBytes: 1048576
+        },
+        production: {
+          dashboardAuth: { mode: 'proxy', userHeader: 'x-forwarded-user', trustedProxies: ['10.0.0.1'] }
+        }
+      }
+      export default config
+    `)
+    const config = await loadConfig(configPath)
+    expect(config.collector?.loadAllowRemoteHosts).toEqual(['staging.internal'])
+    expect(config.collector?.allowedOrigins).toEqual(['http://dash.internal'])
+    expect(config.collector?.maxRequestBytes).toBe(1048576)
+    expect(config.production?.dashboardAuth?.mode).toBe('proxy')
+  })
 })

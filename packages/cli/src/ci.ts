@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { createCollector, resolveStore } from '@apiscope/collector'
-import { evaluateAssertions, runLoadTest, type LoadRunResult } from '@apiscope/load'
+import { assertAllowedTarget, evaluateAssertions, runLoadTest, type LoadRunResult } from '@apiscope/load'
 import {
   baselineFromResults,
   detectRouteDrift,
@@ -62,6 +62,14 @@ export async function runCi(options: CiOptions): Promise<CiRun> {
     log(message)
     return { exitCode: 2, reportText: message }
   }
+  const readinessAllowlist = [...new Set(ci.scenarios.flatMap((entry) => entry.scenario.allowRemoteHosts ?? []))]
+  try {
+    await assertAllowedTarget(ci.readiness.url, readinessAllowlist)
+  } catch (error) {
+    const message = `ci.readiness.url is not an allowed target: ${error instanceof Error ? error.message : String(error)}`
+    log(message)
+    return { exitCode: 2, reportText: message }
+  }
   const ready = await waitForReadiness(ci.readiness.url, ci.readiness.timeoutMs ?? 60000, ci.readiness.intervalMs ?? 500)
   if (!ready) {
     const message = `target not ready: ${ci.readiness.url}`
@@ -72,7 +80,15 @@ export async function runCi(options: CiOptions): Promise<CiRun> {
   const store = storage === undefined ? undefined : await resolveStore(storage)
   const dbPath = join(options.cwd, '.apiscope', `ci-${process.pid}-${randomUUID()}.db`)
   if (storage === undefined) mkdirSync(dirname(dbPath), { recursive: true })
-  const collector = createCollector({ dbPath, port: 0, ...(store === undefined ? {} : { store }) })
+  const collectorConfig = options.config.collector
+  const collector = createCollector({
+    dbPath,
+    port: 0,
+    ...(store === undefined ? {} : { store }),
+    ...(collectorConfig?.loadAllowRemoteHosts === undefined ? {} : { loadAllowRemoteHosts: collectorConfig.loadAllowRemoteHosts }),
+    ...(collectorConfig?.allowedOrigins === undefined ? {} : { allowedOrigins: collectorConfig.allowedOrigins }),
+    ...(collectorConfig?.maxRequestBytes === undefined ? {} : { maxRequestBytes: collectorConfig.maxRequestBytes })
+  })
   const address = await collector.listen()
   log(`APISCOPE_COLLECTOR_URL=ws://${address.host}:${address.port}`)
   try {
