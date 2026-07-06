@@ -3,7 +3,19 @@ import { parseCliArgs } from '../src/cli'
 
 describe('parseCliArgs', () => {
   it('defaults to dev', () => {
-    expect(parseCliArgs([])).toEqual({ command: 'dev', configPath: null })
+    expect(parseCliArgs([])).toEqual({ command: 'dev', configPath: null, open: true })
+  })
+
+  it('parses dev with --no-open', () => {
+    expect(parseCliArgs(['dev', '--no-open'])).toEqual({ command: 'dev', configPath: null, open: false })
+  })
+
+  it('parses dev with --config and without --no-open', () => {
+    expect(parseCliArgs(['dev', '--config', './apiscope.config.ts'])).toEqual({
+      command: 'dev',
+      configPath: './apiscope.config.ts',
+      open: true
+    })
   })
 
   it('parses ci with flags', () => {

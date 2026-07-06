@@ -1,5 +1,11 @@
 # @apiscope/cli
 
+## 0.1.3
+
+### Patch Changes
+
+- `apiscope dev` now welcomes you: it detects the framework in your current directory (Next.js, NestJS, Fastify, Express, or Hono), prints the exact adapter install command and usage snippet if you haven't instrumented your app yet (or a short confirmation if you already have), and opens the dashboard in your browser. Pass `--no-open` to skip the browser launch; it never opens automatically in CI or when output isn't a TTY.
+
 ## 0.1.2
 
 ### Patch Changes

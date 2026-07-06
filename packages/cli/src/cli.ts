@@ -22,10 +22,11 @@ import { createCollectorClient, startHttpServer, startStdioServer } from '@apisc
 import { runCi } from './ci'
 import { ConfigError, loadConfig, type ApiscopeConfig, type OtlpConfig, type ProductionConfig } from './config'
 import { generateScenarioCommand } from './generate-scenario'
+import { alreadyInstrumented, detectFramework, openBrowser, shouldOpenBrowser } from './onboarding'
 import { resolveSecret } from './secrets'
 
 export type CliInvocation =
-  | { command: 'dev'; configPath: string | null }
+  | { command: 'dev'; configPath: string | null; open: boolean }
   | { command: 'serve'; configPath: string | null }
   | { command: 'ci'; configPath: string | null; updateBaseline: boolean; jsonPath?: string; junitPath?: string }
   | { command: 'generate-scenario'; configPath: string | null; window: string; baseUrl: string; shape: 'steady' | 'ramp'; out: string }
@@ -51,13 +52,14 @@ export function parseCliArgs(argv: string[]): CliInvocation {
       http: { type: 'boolean', default: false },
       port: { type: 'string' },
       collector: { type: 'string' },
+      'no-open': { type: 'boolean' },
       help: { type: 'boolean', default: false }
     }
   })
   if (values.help) return { command: 'help' }
   const command = positionals[0] ?? 'dev'
   const configPath = values.config ?? null
-  if (command === 'dev') return { command: 'dev', configPath }
+  if (command === 'dev') return { command: 'dev', configPath, open: values['no-open'] !== true }
   if (command === 'serve') return { command: 'serve', configPath }
   if (command === 'ci') {
     return {
@@ -94,6 +96,7 @@ const helpText = `apiscope
 
 usage:
   apiscope [dev] [--config path]        start collector and dashboard
+    --no-open                            do not open the dashboard in a browser
   apiscope serve [--config path]        start the production collector
   apiscope ci [--config path]           run scenarios, budgets and diffs
     --update-baseline                   write a new baseline instead of checking
@@ -200,6 +203,7 @@ function resolveOtlpOptions(otlp: OtlpConfig | undefined): Pick<CollectorOptions
 interface StartCollectorServerOptions {
   defaultHost: string
   announce: 'dev' | 'prod'
+  open?: boolean
 }
 
 async function startCollectorServer(configPath: string | null, options: StartCollectorServerOptions): Promise<void> {
@@ -257,8 +261,23 @@ async function startCollectorServer(configPath: string | null, options: StartCol
     console.log('warning: previous database was corrupt and has been rotated away')
   }
   if (options.announce === 'dev') {
+    const dashboardUrl = `http://${address.host}:${address.port}`
     console.log(`apiscope collector listening on ws://${address.host}:${address.port}`)
-    console.log(`dashboard: http://${address.host}:${address.port}`)
+    console.log(`dashboard: ${dashboardUrl}`)
+    const hint = detectFramework(cwd)
+    if (hint !== undefined) {
+      if (alreadyInstrumented(cwd, hint)) {
+        console.log(`\ndetected ${hint.name}, its traffic will appear here`)
+      } else {
+        console.log(`\ndetected ${hint.name}. Instrument your app:\n`)
+        console.log(`  ${hint.install}\n`)
+        for (const line of hint.snippet.split('\n')) {
+          console.log(line.length === 0 ? '' : `  ${line}`)
+        }
+        console.log('')
+      }
+    }
+    if (shouldOpenBrowser(options.open ?? true)) openBrowser(dashboardUrl)
   } else {
     console.log(`apiscope collector serving on ${address.host}:${address.port}`)
   }
@@ -270,8 +289,8 @@ async function startCollectorServer(configPath: string | null, options: StartCol
   process.on('SIGTERM', () => void stop())
 }
 
-async function runDev(configPath: string | null): Promise<void> {
-  await startCollectorServer(configPath, { defaultHost: '127.0.0.1', announce: 'dev' })
+async function runDev(configPath: string | null, open: boolean): Promise<void> {
+  await startCollectorServer(configPath, { defaultHost: '127.0.0.1', announce: 'dev', open })
 }
 
 async function runServe(configPath: string | null): Promise<void> {
@@ -312,7 +331,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   }
   try {
     if (invocation.command === 'dev') {
-      await runDev(invocation.configPath)
+      await runDev(invocation.configPath, invocation.open)
       return
     }
     if (invocation.command === 'serve') {
