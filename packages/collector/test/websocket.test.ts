@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 import { encodeWireMessage, PROTOCOL_VERSION } from '@apiscope/core'
 import type { RequestSpan } from '@apiscope/core'
+import { createDashboardAuthenticator } from '../src/auth/dashboard-auth'
 import { createTokenIngestAuthenticator } from '../src/auth/ingest-auth'
+import { createSessionCodec } from '../src/auth/session'
 import { createCollector, type Collector } from '../src/index'
 
 let collector: Collector
@@ -11,9 +13,9 @@ afterEach(async () => {
   await collector.close()
 })
 
-function connect(url: string): Promise<WebSocket> {
+function connect(url: string, headers?: Record<string, string>): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(url)
+    const socket = new WebSocket(url, headers === undefined ? undefined : { headers })
     socket.once('open', () => resolve(socket))
     socket.once('error', reject)
   })
@@ -110,5 +112,39 @@ describe('WebSocket ingest and live subscriptions', () => {
     collector = createCollector({ dbPath: ':memory:', port: 0, ingestAuth })
     const { port } = await collector.listen()
     await expect(connect(`ws://127.0.0.1:${port}/ws/ingest`)).rejects.toThrow()
+  })
+
+  it('refuses an unauthenticated /ws/live upgrade when dashboard auth requires a session', async () => {
+    const sessionSecret = 'ws-live-guard-test-secret-value-abcdefgh'
+    const dashboardAuth = await createDashboardAuthenticator({
+      mode: 'password',
+      sessionSecret,
+      users: [{ username: 'u', passwordHash: 'unused', displayName: 'U' }]
+    })
+    collector = createCollector({ dbPath: ':memory:', port: 0, dashboardAuth })
+    const { port } = await collector.listen()
+    await expect(connect(`ws://127.0.0.1:${port}/ws/live`)).rejects.toThrow()
+  })
+
+  it('accepts a /ws/live upgrade carrying a valid dashboard session cookie', async () => {
+    const sessionSecret = 'ws-live-guard-test-secret-value-abcdefgh'
+    const dashboardAuth = await createDashboardAuthenticator({
+      mode: 'password',
+      sessionSecret,
+      users: [{ username: 'u', passwordHash: 'unused', displayName: 'U' }]
+    })
+    collector = createCollector({ dbPath: ':memory:', port: 0, dashboardAuth })
+    const { port } = await collector.listen()
+    const codec = createSessionCodec(new TextEncoder().encode(sessionSecret))
+    const token = await codec.issue({ subject: 'u', displayName: 'U' }, 3600)
+    const live = await connect(`ws://127.0.0.1:${port}/ws/live`, { cookie: `apiscope_session=${token}` })
+    live.close()
+  })
+
+  it('allows an unauthenticated /ws/live upgrade when dashboard auth is none', async () => {
+    collector = createCollector({ dbPath: ':memory:', port: 0 })
+    const { port } = await collector.listen()
+    const live = await connect(`ws://127.0.0.1:${port}/ws/live`)
+    live.close()
   })
 })

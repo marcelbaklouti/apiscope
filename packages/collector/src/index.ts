@@ -341,7 +341,7 @@ export function createCollector(options: CollectorOptions): Collector {
   }
   const guardedDynamicHandlers = dynamicHandlers.map((handler) => wrapDynamicWithDashboardGuard(handler, dashboardAuth))
   const server: Server = createHttpServer(guardedRoutes, guardedDynamicHandlers, options.tls)
-  attachWebSockets(server, processor, hub, ingestAuth, metrics, profileChannel)
+  attachWebSockets(server, processor, hub, ingestAuth, metrics, profileChannel, dashboardAuth)
   const otlpGrpcServer =
     options.otlpIngest?.grpc === true
       ? createOtlpGrpcServer({

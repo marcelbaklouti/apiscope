@@ -1,5 +1,6 @@
 import type { Server } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
+import type { DashboardAuthenticator } from './auth/dashboard-auth'
 import { createNoneIngestAuthenticator, type IngestAuthenticator } from './auth/ingest-auth'
 import { IngestProcessor, type IngestSession } from './ingest'
 import type { LiveTransport } from './live/live-transport'
@@ -12,7 +13,8 @@ export function attachWebSockets(
   hub: LiveTransport,
   ingestAuth: IngestAuthenticator = createNoneIngestAuthenticator(),
   metrics?: CollectorMetrics,
-  profileChannel?: ProfileChannelRegistry
+  profileChannel?: ProfileChannelRegistry,
+  dashboardAuth?: DashboardAuthenticator
 ): void {
   const ingestServer = new WebSocketServer({ noServer: true })
   const liveServer = new WebSocketServer({ noServer: true })
@@ -62,7 +64,18 @@ export function attachWebSockets(
       ;(request as { apiscopeAuthenticatedApp?: string | null }).apiscopeAuthenticatedApp = identity.appName === '' ? null : identity.appName
       ingestServer.handleUpgrade(request, socket, head, (client) => ingestServer.emit('connection', client, request))
     } else if (url.pathname === '/ws/live') {
-      liveServer.handleUpgrade(request, socket, head, (client) => liveServer.emit('connection', client, request))
+      if (dashboardAuth === undefined) {
+        liveServer.handleUpgrade(request, socket, head, (client) => liveServer.emit('connection', client, request))
+        return
+      }
+      void dashboardAuth.authenticate(request).then((identity) => {
+        if (identity === null) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+          socket.destroy()
+          return
+        }
+        liveServer.handleUpgrade(request, socket, head, (client) => liveServer.emit('connection', client, request))
+      })
     } else {
       socket.destroy()
     }
