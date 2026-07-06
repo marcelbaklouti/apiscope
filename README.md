@@ -1,52 +1,99 @@
 # apiscope
 
-Free, local-first API observability and load testing for JavaScript frameworks. Route explorer, live request inspector with latency waterfalls, a coordinated-omission-safe load engine, and CI latency budgets — no account, no cloud, your data never leaves your machine.
+Free, local-first API observability and load testing for JavaScript frameworks — a route explorer, a live request inspector with latency waterfalls, a coordinated-omission-safe load engine, and CI latency budgets. No account, no cloud, your request data never leaves your machine.
 
-## Why
+[![npm](https://img.shields.io/npm/v/apiscope.svg)](https://www.npmjs.com/package/apiscope)
+[![license](https://img.shields.io/npm/l/apiscope.svg)](LICENSE)
 
-Hosted API monitoring ships your request data to someone else's cloud and bills you for the privilege of watching your own traffic. Every payload, header, and route pattern your app handles ends up on a third party's servers, metered by request volume.
+## What you get
 
-Framework devtools that actually matter — request waterfalls, route registries, payload inspection — are increasingly gated behind paid tiers, turning basic debugging visibility into a recurring line item.
+- **Route explorer** — every route your app serves, discovered automatically.
+- **Live request inspector** — a full-width latency waterfall that updates as traffic flows; click any request to see its headers, payloads, and timing.
+- **Insights** — plain-language, paste-ready fixes: missing gzip/brotli, slow endpoints, N+1 database queries, and more.
+- **Load testing** — out-of-process HTTP load with correct tail latencies (no coordinated omission).
+- **CI budgets** — fail the build when p95 regresses, from a config file you commit.
 
-Load-testing tools force a bad tradeoff: GUI-driven tools lock your scenarios into proprietary XML or point-and-click flows that don't diff cleanly in a pull request, while embedded-runtime tools (Lua, custom DSLs) cut you off from the npm ecosystem and the libraries you already use to build fixtures and assertions.
+## How it works
 
-apiscope is MIT-licensed, runs entirely on localhost, and treats its config file as the single diffable source of truth — no dashboard state, no hosted account, no hidden configuration. What you commit is what runs, in dev and in CI.
+apiscope runs as a **local dashboard**. A small **adapter** you add to your app streams request data to it. Two pieces:
 
-## Quickstart
-
-```bash
-npx apiscope
+```
+   your app                          apiscope
+┌──────────────┐   spans over    ┌──────────────────┐
+│  Next.js /   │ ──────────────▶ │  collector +     │
+│  Express /   │   localhost     │  dashboard       │
+│  Fastify …   │                 │  127.0.0.1:4620  │
+│  + adapter   │                 └──────────────────┘
+└──────────────┘
 ```
 
-Then add one line to your app:
+The dashboard on its own shows nothing — the adapter is what feeds it. Both run only on `127.0.0.1`.
 
-Next.js (`instrumentation.ts`):
+## Get started
+
+### 1. Start apiscope
+
+```bash
+npx apiscope dev
+```
+
+Starts the collector and dashboard on **http://127.0.0.1:4620** and opens it in your browser. Run it from your project root — it detects your framework and prints the exact adapter to add next. Leave it running (`Ctrl+C` to stop).
+
+### 2. Add the adapter to your app
+
+The adapter is a dev dependency plus a few lines of setup. Pick your framework:
+
+<details open>
+<summary><b>Next.js</b> (App or Pages Router)</summary>
+
+```bash
+npm i -D @apiscope/next
+```
 
 ```ts
+// instrumentation.ts
 import { withApiscope } from '@apiscope/next'
 
 const apiscope = withApiscope({ appName: 'web' })
 export const register = apiscope.register
 export const onRequestError = apiscope.onRequestError
 ```
+</details>
 
-Express:
+<details>
+<summary><b>Express</b></summary>
+
+```bash
+npm i -D @apiscope/express
+```
 
 ```ts
 import { apiscopeExpress } from '@apiscope/express'
 
 app.use(apiscopeExpress({ appName: 'api' }))
 ```
+</details>
 
-Fastify:
+<details>
+<summary><b>Fastify</b></summary>
+
+```bash
+npm i -D @apiscope/fastify
+```
 
 ```ts
 import { apiscopeFastify } from '@apiscope/fastify'
 
 await app.register(apiscopeFastify, { appName: 'api' })
 ```
+</details>
 
-NestJS:
+<details>
+<summary><b>NestJS</b></summary>
+
+```bash
+npm i -D @apiscope/nestjs
+```
 
 ```ts
 import { ApiscopeModule } from '@apiscope/nestjs'
@@ -54,18 +101,32 @@ import { ApiscopeModule } from '@apiscope/nestjs'
 @Module({ imports: [ApiscopeModule.forRoot({ appName: 'api' })] })
 export class AppModule {}
 ```
+</details>
 
-Hono:
+<details>
+<summary><b>Hono</b> (Node, Bun, Deno, Edge)</summary>
+
+```bash
+npm i -D @apiscope/hono
+```
 
 ```ts
 import { apiscopeHono } from '@apiscope/hono'
 
 apiscopeHono(app, { appName: 'edge-api' })
 ```
+</details>
+
+### 3. Run your app and make some requests
+
+Start your app as usual and hit a few routes. They appear in the dashboard live — routes, latency waterfalls, payloads, and Insights.
 
 ## Load testing and CI
 
+apiscope also runs HTTP load tests and enforces latency budgets, both driven by one typed config file you commit. Load always runs out-of-process over real HTTP, so your app's event loop never skews the percentiles.
+
 ```ts
+// apiscope.config.ts
 import { defineConfig } from 'apiscope'
 
 export default defineConfig({
@@ -90,40 +151,50 @@ export default defineConfig({
 ```
 
 ```bash
-apiscope ci
-apiscope ci --update-baseline
+apiscope ci                                   # run scenarios, check budgets and drift
+apiscope ci --update-baseline                 # save a new baseline
 apiscope ci --json report.json --junit report.xml
 ```
 
-## Design principles
+Exit codes: `0` pass, `1` a budget/diff/drift failure, `2` a runtime error.
 
-- Open-model load generation measured from intended send time — no coordinated omission
-- Out-of-process generation — the load engine never runs inside your app's own event loop
-- Worker self-metrics reported with every run, so you can see when the load generator itself is the bottleneck
-- Payload redaction on by default
-- Collector bound to 127.0.0.1 — never exposed beyond localhost
-- Zero telemetry
-- `GET /metrics` is intentionally exempt from dashboard auth, matching standard Prometheus scrape conventions (Prometheus can't present a session cookie) — network-restrict it in production the same way you would any other unauthenticated scrape endpoint
+## What makes it different
+
+- **Local-first.** Runs entirely on `127.0.0.1`, no account, zero telemetry — your payloads, headers, and routes never leave your machine.
+- **Honest latency numbers.** Open-model load is measured from the *intended* send time and generated out-of-process, so you never get coordinated omission or event-loop skew.
+- **Config is the source of truth.** One typed, diffable `apiscope.config.ts` drives both dev and CI — no dashboard state to reproduce, what you commit is what runs.
+- **Safe by default.** `authorization`/`cookie` headers are redacted and bodies are capped before anything is stored.
+- **Actionable, not just charts.** The advisor turns captured traffic into paste-ready fixes.
+
+## Self-hosting
+
+The same codebase runs as a self-hostable **production** backend — ClickHouse storage, authenticated ingest and dashboard, tail sampling, and Valkey live fan-out. Dev mode is that backend with every seam at its zero-config default, so nothing about your local setup has to change to scale it up.
 
 ## Packages
 
-| Package | Description |
+You only install the CLI and one adapter. The rest are internal building blocks, listed for reference.
+
+| Package | What it is |
 | --- | --- |
-| `@apiscope/core` | Span model and wire protocol for apiscope |
-| `@apiscope/collector` | Local collector daemon with SQLite store and live streaming |
-| `@apiscope/store-clickhouse` | ClickHouse span store for apiscope |
-| `@apiscope/adapter-node` | Shared Node.js adapter runtime with span context and undici capture |
-| `@apiscope/express` | Express adapter for apiscope |
-| `@apiscope/fastify` | Fastify adapter for apiscope |
-| `@apiscope/nestjs` | NestJS adapter for apiscope |
-| `@apiscope/next` | Next.js adapter for apiscope |
-| `@apiscope/hono` | Hono adapter for apiscope (Node, Bun, Deno, Edge) |
-| `@apiscope/load` | Coordinated-omission-safe load engine for apiscope |
-| `@apiscope/advisor` | Pure-function advisor rules that turn captured traffic into paste-ready fixes |
 | `apiscope` | The CLI (`npx apiscope`): dev collector + dashboard, load testing, CI budgets, scenario generation |
-| `@apiscope/dashboard` | apiscope dashboard UI, including the mobile-first Insights hub |
-| `@apiscope/mcp` | MCP server exposing apiscope's collector API as tools for coding agents |
+| `@apiscope/next` | Next.js adapter |
+| `@apiscope/express` | Express adapter |
+| `@apiscope/fastify` | Fastify adapter |
+| `@apiscope/nestjs` | NestJS adapter |
+| `@apiscope/hono` | Hono adapter (Node, Bun, Deno, Edge) |
+| `@apiscope/core` | Span model and versioned wire protocol |
+| `@apiscope/collector` | Local collector daemon: SQLite store, live streaming, load orchestration, CI runner |
+| `@apiscope/load` | Coordinated-omission-safe load engine |
+| `@apiscope/advisor` | Pure-function rules that turn captured traffic into paste-ready fixes |
+| `@apiscope/adapter-node` | Shared Node.js adapter runtime (span context, undici capture) |
+| `@apiscope/store-clickhouse` | ClickHouse span store for self-hosted production mode |
+| `@apiscope/dashboard` | The dashboard UI, including the mobile-first Insights hub |
+| `@apiscope/mcp` | MCP server exposing the collector API as tools for coding agents |
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT
+[MIT](LICENSE)
