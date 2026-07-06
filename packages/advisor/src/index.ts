@@ -1,3 +1,5 @@
 export * from './types'
 export * from './config'
 export * from './util/statement'
+export { resolveFix } from './fixes'
+export type { FixParams } from './fixes'
