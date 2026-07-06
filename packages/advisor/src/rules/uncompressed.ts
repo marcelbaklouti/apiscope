@@ -56,7 +56,7 @@ export const uncompressedResponsesRule: Rule = {
         ruleId: 'uncompressed-responses',
         category: 'payload',
         severity: 'warning',
-        title: `${qualifyingRoutes.length} route${qualifyingRoutes.length === 1 ? '' : 's'} send uncompressed responses`,
+        title: `${qualifyingRoutes.length} route${qualifyingRoutes.length === 1 ? '' : 's'} ${qualifyingRoutes.length === 1 ? 'sends' : 'send'} uncompressed responses`,
         whatAndWhy:
           'Text responses over ~1.4 KB are sent without gzip or brotli, so clients download several times more bytes than they need to.',
         impact: {
