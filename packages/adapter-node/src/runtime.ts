@@ -101,6 +101,10 @@ export class AdapterRuntime {
     return this.storage.getStore() ?? null
   }
 
+  get capturesBodies(): boolean {
+    return this.capture === 'full'
+  }
+
   capturePayload(headers: Record<string, string>, body: string | undefined): CapturedPayload | undefined {
     if (this.capture === 'none') return undefined
     const capturedBody = this.capture === 'full' ? body : undefined

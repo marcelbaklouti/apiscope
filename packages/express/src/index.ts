@@ -1,6 +1,6 @@
 import type { Express, NextFunction, Request, RequestHandler, Response } from 'express'
 import { AdapterRuntime, subscribeUndici, type AdapterRuntimeOptions } from '@apiscope/adapter-node'
-import { newSpanId } from '@apiscope/core'
+import { BODY_CAPTURE_LIMIT_BYTES, newSpanId } from '@apiscope/core'
 import { extractExpressRoutes } from './routes'
 
 export { extractExpressRoutes } from './routes'
@@ -16,6 +16,21 @@ function flattenHeaders(headers: Record<string, string | string[] | number | und
     flattened[name] = Array.isArray(value) ? value.join(', ') : String(value)
   }
   return flattened
+}
+
+function createBoundedChunkBuffer(limitBytes: number): { push(chunk: Buffer): void; toStringOrUndefined(): string | undefined } {
+  const chunks: Buffer[] = []
+  let bufferedBytes = 0
+  return {
+    push(chunk) {
+      if (bufferedBytes > limitBytes) return
+      chunks.push(chunk)
+      bufferedBytes += chunk.byteLength
+    },
+    toStringOrUndefined() {
+      return chunks.length === 0 ? undefined : Buffer.concat(chunks).toString('utf8')
+    }
+  }
 }
 
 export function apiscopeExpress(options: ExpressAdapterOptions): RequestHandler {
@@ -45,35 +60,38 @@ export function apiscopeExpress(options: ExpressAdapterOptions): RequestHandler 
       const startedAtWall = Date.now()
       const startedAt = performance.now()
       let ttfb: number | null = null
-      const responseChunks: Buffer[] = []
       const originalWriteHead = response.writeHead.bind(response)
       response.writeHead = ((...writeHeadArguments: Parameters<Response['writeHead']>) => {
         if (ttfb === null) ttfb = performance.now() - startedAt
         return originalWriteHead(...writeHeadArguments)
       }) as Response['writeHead']
-      const originalWrite = response.write.bind(response)
-      response.write = ((chunk: unknown, ...rest: unknown[]) => {
-        if (chunk !== undefined && chunk !== null) responseChunks.push(Buffer.from(chunk as Buffer | string))
-        return (originalWrite as (...writeArguments: unknown[]) => boolean)(chunk, ...rest)
-      }) as Response['write']
-      const originalEnd = response.end.bind(response)
-      response.end = ((chunk?: unknown, ...rest: unknown[]) => {
-        if (chunk !== undefined && chunk !== null && typeof chunk !== 'function') {
-          responseChunks.push(Buffer.from(chunk as Buffer | string))
-        }
-        return (originalEnd as (...endArguments: unknown[]) => Response)(chunk, ...rest)
-      }) as Response['end']
+      const capturesBodies = runtime.capturesBodies
+      const responseBuffer = capturesBodies ? createBoundedChunkBuffer(BODY_CAPTURE_LIMIT_BYTES) : null
+      if (responseBuffer !== null) {
+        const originalWrite = response.write.bind(response)
+        response.write = ((chunk: unknown, ...rest: unknown[]) => {
+          if (chunk !== undefined && chunk !== null) responseBuffer.push(Buffer.from(chunk as Buffer | string))
+          return (originalWrite as (...writeArguments: unknown[]) => boolean)(chunk, ...rest)
+        }) as Response['write']
+        const originalEnd = response.end.bind(response)
+        response.end = ((chunk?: unknown, ...rest: unknown[]) => {
+          if (chunk !== undefined && chunk !== null && typeof chunk !== 'function') {
+            responseBuffer.push(Buffer.from(chunk as Buffer | string))
+          }
+          return (originalEnd as (...endArguments: unknown[]) => Response)(chunk, ...rest)
+        }) as Response['end']
+      }
       response.on('finish', () => {
         try {
           const routePath = (request as Request & { route?: { path: string } }).route?.path
           const routePattern = routePath === undefined ? null : `${request.baseUrl}${routePath}`.replace(/\/{2,}/g, '/')
           const requestPayload = runtime.capturePayload(
             flattenHeaders(request.headers),
-            request.body === undefined ? undefined : JSON.stringify(request.body)
+            !capturesBodies || request.body === undefined ? undefined : JSON.stringify(request.body)
           )
           const responsePayload = runtime.capturePayload(
             flattenHeaders(response.getHeaders() as Record<string, string | string[] | number | undefined>),
-            responseChunks.length === 0 ? undefined : Buffer.concat(responseChunks).toString('utf8')
+            responseBuffer?.toStringOrUndefined()
           )
           runtime.recordSpan({
             id: context.spanId,
