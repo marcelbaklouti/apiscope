@@ -11,6 +11,28 @@
   --status-4xx: #d9a621;
   --status-5xx: #dc5252;
   --kind-db: #9b8fb0;
+
+  --severity-critical: #f26d5b;
+  --severity-critical-surface: rgba(242, 109, 91, 0.1);
+  --severity-critical-edge: rgba(242, 109, 91, 0.42);
+  --severity-warning: #e8b04b;
+  --severity-warning-surface: rgba(232, 176, 75, 0.1);
+  --severity-warning-edge: rgba(232, 176, 75, 0.4);
+  --severity-advisory: #5fb0c4;
+  --severity-advisory-surface: rgba(95, 176, 196, 0.1);
+  --severity-advisory-edge: rgba(95, 176, 196, 0.38);
+
+  --surface-sunken: #0d0d0f;
+  --surface-card: #131316;
+  --surface-card-hover: #17171b;
+  --surface-inset: #0f0f12;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-press: 140ms;
+  --dur-expand: 240ms;
+  --dur-enter: 420ms;
+
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
@@ -42,4 +64,19 @@
   --status-4xx: #8f6a00;
   --status-5xx: #b32d2d;
   --kind-db: #6f6183;
+
+  --severity-critical: #cc3a26;
+  --severity-critical-surface: rgba(204, 58, 38, 0.09);
+  --severity-critical-edge: rgba(204, 58, 38, 0.34);
+  --severity-warning: #9a6a00;
+  --severity-warning-surface: rgba(154, 106, 0, 0.09);
+  --severity-warning-edge: rgba(154, 106, 0, 0.3);
+  --severity-advisory: #2f7a90;
+  --severity-advisory-surface: rgba(47, 122, 144, 0.09);
+  --severity-advisory-edge: rgba(47, 122, 144, 0.3);
+
+  --surface-sunken: #efede9;
+  --surface-card: #ffffff;
+  --surface-card-hover: #faf9f6;
+  --surface-inset: #f1efeb;
 }
