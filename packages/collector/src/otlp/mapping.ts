@@ -45,6 +45,7 @@ function millisToNano(millis: number): string {
 }
 
 function nanoToMillis(nano: string): number {
+  if (!/^\d+$/.test(nano)) return 0
   return Number(BigInt(nano) / 1_000_000n)
 }
 

@@ -8,6 +8,7 @@ export interface OtlpHttpHandlerDeps {
   ingest(appName: string, spans: RequestSpan[], childSpans: ChildSpan[]): Promise<void>
   appName?: string
   ingestAuth?: IngestAuthenticator
+  maxRequestBytes?: number
 }
 
 function resourceServiceName(resourceSpans: OtlpResourceSpans, fallback: string): string {
@@ -43,7 +44,7 @@ export function createOtlpHttpHandler(deps: OtlpHttpHandlerDeps): DynamicHandler
       if (identity.appName !== '') boundAppName = identity.appName
     }
     const contentType = request.headers['content-type'] ?? ''
-    const raw = await readRawBody(request)
+    const raw = await readRawBody(request, deps.maxRequestBytes)
     let exportRequest: OtlpExportTraceServiceRequest
     try {
       if (contentType.includes('application/x-protobuf')) {

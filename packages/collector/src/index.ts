@@ -22,7 +22,7 @@ import { createStaticHandler } from './static'
 import { SqliteSpanStore } from './store'
 import type { SpanStore } from './store-interface'
 import { attachWebSockets } from './websocket'
-import { createHttpServer, readBody, sendJson, type CollectorOptions, type DynamicHandler, type RouteHandler } from './server'
+import { createHttpServer, DEFAULT_MAX_REQUEST_BYTES, readBody, sendJson, type CollectorOptions, type DynamicHandler, type RouteHandler } from './server'
 
 export type { CollectorOptions }
 export type { SpanStore, RouteStats, StoredLoadRun, StoredLoadRunSummary } from './store-interface'
@@ -87,14 +87,14 @@ async function countNPlusOneRequestsByRoute(store: SpanStore): Promise<Map<strin
   return counts
 }
 
-function handleIngest(processor: IngestProcessor, ingestAuth: IngestAuthenticator) {
+function handleIngest(processor: IngestProcessor, ingestAuth: IngestAuthenticator, maxRequestBytes: number) {
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const identity = ingestAuth.authenticate(request)
     if (identity === null) {
       sendJson(response, 401, { error: 'unauthorized' })
       return
     }
-    const raw = await readBody(request)
+    const raw = await readBody(request, maxRequestBytes)
     const headerApp = request.headers['x-apiscope-app']
     const session = {
       appName: typeof headerApp === 'string' ? headerApp : null,
@@ -185,6 +185,9 @@ export function createCollector(options: CollectorOptions): Collector {
   const ingestAuth = options.ingestAuth ?? createNoneIngestAuthenticator()
   const dashboardAuth = options.dashboardAuth ?? createInlineNoneDashboardAuthenticator()
   const advisorConfig = options.advisor !== undefined ? resolveAdvisorConfig(options.advisor) : resolveAdvisorConfigFromMeta(options.meta)
+  const loadAllowRemoteHosts = options.loadAllowRemoteHosts ?? []
+  const allowedOrigins = options.allowedOrigins ?? []
+  const maxRequestBytes = options.maxRequestBytes ?? DEFAULT_MAX_REQUEST_BYTES
   if (dashboardAuth.mode === 'none' && !isLoopbackHost(host) && options.allowInsecure !== true) {
     throw new Error('refusing to start: dashboard auth is "none" on a non-loopback host; set allowInsecure to override (insecure)')
   }
@@ -201,7 +204,7 @@ export function createCollector(options: CollectorOptions): Collector {
   for (const [route, handler] of dashboardAuth.routes) {
     routes.set(route, handler)
   }
-  routes.set('POST /ingest', handleIngest(processor, ingestAuth))
+  routes.set('POST /ingest', handleIngest(processor, ingestAuth, maxRequestBytes))
   routes.set('GET /api/spans', async (request, response, url) => {
     const requested = Number(url.searchParams.get('limit') ?? '100')
     const limit = Number.isFinite(requested) ? Math.min(Math.max(1, requested), 1000) : 100
@@ -257,17 +260,20 @@ export function createCollector(options: CollectorOptions): Collector {
   routes.set('GET /api/meta', (request, response) => sendJson(response, 200, { meta: buildSafeMeta(options.meta) }))
   routes.set('GET /api/load-runs', async (request, response) => sendJson(response, 200, await store.listLoadRuns()))
   routes.set('POST /api/load-runs', async (request, response) => {
-    const raw = await readBody(request)
+    const raw = await readBody(request, maxRequestBytes)
     try {
       const parsed = JSON.parse(raw) as LoadRunRequest
-      const { runId } = startLoadRun(parsed, store, hub)
+      const { hooksModule, ...networkSafeScenario } = parsed.scenario
+      void hooksModule
+      const safeRequest: LoadRunRequest = { scenario: networkSafeScenario, ...(parsed.assertions === undefined ? {} : { assertions: parsed.assertions }) }
+      const { runId } = await startLoadRun(safeRequest, store, hub, loadAllowRemoteHosts)
       sendJson(response, 202, { runId })
     } catch (error) {
       sendJson(response, 400, { error: error instanceof Error ? error.message : 'invalid request' })
     }
   })
   routes.set('POST /api/profiles', async (request, response) => {
-    const raw = await readBody(request)
+    const raw = await readBody(request, maxRequestBytes)
     try {
       const { appName, durationMs } = JSON.parse(raw) as { appName?: string; durationMs?: number }
       if (typeof appName !== 'string' || appName === '') throw new Error('appName is required')
@@ -349,6 +355,7 @@ export function createCollector(options: CollectorOptions): Collector {
       ? createOtlpHttpHandler({
           appName: options.otlpIngest.appName ?? 'otlp',
           ingestAuth,
+          maxRequestBytes,
           ingest: (appName, spans, childSpans) => processor.ingestSpans(appName, spans, childSpans)
         })
       : null
@@ -366,7 +373,7 @@ export function createCollector(options: CollectorOptions): Collector {
   }
   const guardedDynamicHandlers = dynamicHandlers.map((handler) => wrapDynamicWithDashboardGuard(handler, dashboardAuth))
   const server: Server = createHttpServer(guardedRoutes, guardedDynamicHandlers, options.tls)
-  attachWebSockets(server, processor, hub, ingestAuth, metrics, profileChannel, dashboardAuth)
+  attachWebSockets(server, processor, hub, ingestAuth, metrics, profileChannel, dashboardAuth, { allowedOrigins, maxPayload: maxRequestBytes })
   const otlpGrpcServer =
     options.otlpIngest?.grpc === true
       ? createOtlpGrpcServer({
