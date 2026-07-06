@@ -90,6 +90,21 @@ test('overview visual snapshot dark and light', async ({ page }) => {
   await expect(page).toHaveScreenshot('overview-light.png')
 })
 
+test('insights hub visual snapshot dark and light (desktop)', async ({ page }) => {
+  await page.goto('/#/insights')
+  await expect(page.getByTestId('health-verdict')).toBeVisible()
+  await expect(page).toHaveScreenshot('insights-desktop-dark.png')
+  await page.getByRole('button', { name: 'toggle theme' }).click()
+  await expect(page).toHaveScreenshot('insights-desktop-light.png')
+})
+
+test('insights hub visual snapshot mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/#/insights')
+  await expect(page.getByTestId('health-verdict')).toBeVisible()
+  await expect(page).toHaveScreenshot('insights-mobile-dark.png')
+})
+
 test('inspector deep link shows waterfall, payload and redaction badge', async ({ page }) => {
   await page.goto('/#/inspector/seed-0')
   await expect(page.getByTestId('span-detail-title')).toContainText('GET /api/users/0')
