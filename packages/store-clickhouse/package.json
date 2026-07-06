@@ -1,6 +1,6 @@
 {
   "name": "@apiscope/store-clickhouse",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "description": "ClickHouse span store for apiscope",
   "repository": {

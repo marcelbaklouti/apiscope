@@ -1,5 +1,11 @@
 # @apiscope/collector
 
+## 0.1.1
+
+### Patch Changes
+
+- Ship the vendored OpenTelemetry `.proto` files with the collector. The `proto/` directory was missing from the published `files`, so the collector threw "unable to locate the vendored otlp proto directory" on load when installed from npm (breaking `npx apiscope`). Adding `proto` to `files` includes them in the published package.
+
 ## 0.1.0
 
 ### Minor Changes
